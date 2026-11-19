@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cadastro e Agendamentos</title>
+<style>
+  :root { --bg:#f6f7f9; --card:#fff; --txt:#1c2430; --sub:#5b6676; --linha:#e3e7ec;
+          --agendado:#2563eb; --realizado:#15803d; --cancelado:#9ca3af; --destaque:#fff7d6; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#0f141b; --card:#171e27; --txt:#e6ebf1; --sub:#9aa6b5; --linha:#263040;
+            --agendado:#60a5fa; --realizado:#4ade80; --cancelado:#6b7280; --destaque:#2b2a12; }
+  }
+  * { box-sizing: border-box; }
+  body { margin:0; padding:24px 16px; background:var(--bg); color:var(--txt);
+         font:15px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  header { max-width:1200px; margin:0 auto 16px; }
+  h1 { font-size:22px; margin:0 0 4px; }
+  header p { margin:0; color:var(--sub); }
+  main { max-width:1200px; margin:0 auto; display:grid; gap:16px; grid-template-columns:1fr; }
+  @media (min-width: 980px) { main { grid-template-columns: 3fr 2fr; } #auditoria-card { grid-column: 1 / -1; } }
+  section { background:var(--card); border:1px solid var(--linha); border-radius:10px; padding:14px 16px; overflow-x:auto; }
+  h2 { font-size:16px; margin:0 0 10px; }
+  table { width:100%; border-collapse:collapse; font-size:14px; }
+  th, td { text-align:left; padding:6px 8px; border-bottom:1px solid var(--linha); white-space:nowrap; }
+  th { color:var(--sub); font-weight:600; }
+  td.num { text-align:right; font-variant-numeric: tabular-nums; }
+  .st { font-weight:600; }
+  .st.agendado { color:var(--agendado); } .st.realizado { color:var(--realizado); } .st.cancelado { color:var(--cancelado); }
+  tr.novo { background:var(--destaque); }
+  code { font-size:12px; color:var(--sub); white-space:normal; }
+  .vazio { color:var(--sub); }
+</style>
+</head>
+<body>
+<header>
+  <h1>Tema 1 · Cadastro, Agendamentos e Faturamento</h1>
+  <p>Atualiza a cada 2 segundos · <span id="hora">—</span></p>
+</header>
+<main>
+  <section>
+    <h2>Agenda</h2>
+    <table id="agenda"><thead><tr><th>#</th><th>Início</th><th>Paciente</th><th>Médico</th><th>Tipo</th><th>Status</th></tr></thead><tbody></tbody></table>
+  </section>
+  <section>
+    <h2>Faturas</h2>
+    <table id="faturas"><thead><tr><th>#</th><th>Paciente</th><th class="num">Total</th><th class="num">Convênio</th><th class="num">Paciente</th></tr></thead><tbody></tbody></table>
+  </section>
+  <section id="auditoria-card">
+    <h2>Auditoria (últimas alterações)</h2>
+    <table id="auditoria"><thead><tr><th>Quando</th><th>Usuário</th><th>Tabela</th><th>Operação</th><th>Registro</th><th>O que mudou</th></tr></thead><tbody></tbody></table>
+  </section>
+</main>
+<script>
+const esc = v => String(v ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const brl = v => Number(v).toLocaleString("pt-BR", {style:"currency", currency:"BRL"});
+const quando = v => new Date(v).toLocaleString("pt-BR", {dateStyle:"short", timeStyle:"short"});
+const vistos = {agenda:new Set(), faturas:new Set(), auditoria:new Set()};
+let primeira = true;
+
+function preencher(id, itens, chave, linha) {
+  const tbody = document.querySelector(`#${id} tbody`);
+  if (!itens.length) { tbody.innerHTML = `<tr><td colspan="6" class="vazio">Nada por aqui ainda.</td></tr>`; return; }
+  tbody.innerHTML = itens.map(it => {
+    const novo = !primeira && !vistos[id].has(chave(it));
+    return `<tr${novo ? ' class="novo"' : ""}>${linha(it)}</tr>`;
+  }).join("");
+  itens.forEach(it => vistos[id].add(chave(it)));
+}
+
+function diferenca(a) {
+  if (a.operacao === "INSERT") return "cadastro novo";
+  if (a.operacao === "DELETE") return "registro apagado";
+  const antes = a.dados_antigos || {}, depois = a.dados_novos || {};
+  return Object.keys(depois).filter(k => JSON.stringify(antes[k]) !== JSON.stringify(depois[k]))
+    .map(k => `${k}: ${esc(antes[k])} → ${esc(depois[k])}`).join("; ");
+}
+
+async function atualizar() {
+  try {
+    const [ag, fat, aud] = await Promise.all(["/agendamentos", "/faturas", "/auditoria?limit=10"]
+      .map(u => fetch(u).then(r => r.json())));
+    const hoje = new Date(); hoje.setHours(0, 0, 0, 0);
+    const proximos = ag.filter(a => new Date(a.inicio) >= hoje).slice(0, 15);
+    preencher("agenda", proximos, a => a.id + a.status, a =>
+      `<td>${a.id}</td><td>${quando(a.inicio)}</td><td>${esc(a.paciente)}</td><td>${esc(a.medico)}</td>` +
+      `<td>${esc(a.tipo)}</td><td class="st ${esc(a.status)}">${esc(a.status)}</td>`);
+    preencher("faturas", fat.slice(0, 10), f => f.id, f =>
+      `<td>${f.id}</td><td>${esc(f.paciente)}</td><td class="num">${brl(f.valor_total)}</td>` +
+      `<td class="num">${brl(f.valor_convenio)}</td><td class="num">${brl(f.valor_paciente)}</td>`);
+    preencher("auditoria", aud, a => a.id, a =>
+      `<td>${quando(a.em)}</td><td>${esc(a.usuario)}</td><td>${esc(a.tabela)}</td><td>${esc(a.operacao)}</td>` +
+      `<td>${a.registro_id}</td><td><code>${diferenca(a)}</code></td>`);
+    primeira = false;
+    document.getElementById("hora").textContent = "atualizado " + new Date().toLocaleTimeString("pt-BR");
+  } catch (e) {
+    document.getElementById("hora").textContent = "sem conexão com a API";
+  }
+}
+atualizar();
+setInterval(atualizar, 2000);
+</script>
+</body>
+</html>

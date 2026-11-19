@@ -1,0 +1,14 @@
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/
+venv/
+
+# Rascunhos de execução (registro de progresso do Claude)
+.superpowers/
+
+# Sistema / editores
+.DS_Store
+.idea/
+.vscode/

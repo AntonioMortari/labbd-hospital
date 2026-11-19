@@ -1,0 +1,66 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: hospital
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      TZ: America/Sao_Paulo
+      PGTZ: America/Sao_Paulo
+    volumes:
+      - ./db:/docker-entrypoint-initdb.d:ro
+      - pg-data:/var/lib/postgresql/data
+    ports:
+      - "5433:5432"
+    healthcheck:
+      # com -h localhost o check só passa depois que os scripts de db/ terminaram
+      test: ["CMD", "pg_isready", "-U", "postgres", "-h", "localhost", "-d", "hospital"]
+      interval: 3s
+      timeout: 2s
+      retries: 20
+    restart: always
+
+  api:
+    build: ./api
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/hospital
+    depends_on:
+      postgres:
+        condition: service_healthy
+    deploy:
+      replicas: 3
+    restart: always
+
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "8081:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - api
+    restart: always
+
+  tests:
+    build: ./tests
+    profiles: ["test"]
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/hospital
+      BASE_URL: http://nginx
+    volumes:
+      - ./tests:/tests
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  loadtest:
+    build: ./loadtest
+    profiles: ["test"]
+    environment:
+      BASE_URL: http://nginx
+      TZ: America/Sao_Paulo
+    depends_on:
+      - nginx
+
+volumes:
+  pg-data:
