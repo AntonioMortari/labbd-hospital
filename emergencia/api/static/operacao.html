@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Triagem e leitos</title>
+<link rel="preload" href="/static/fonts/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="/static/kit.css">
+<link rel="stylesheet" href="/static/operacao.css?v=4">
+<script src="/static/embed.js"></script>
+</head>
+<body>
+<main class="tela">
+  <header class="cabecalho">
+    <div><h1>Triagem e leitos</h1><p>Quem está esperando, quem foi chamado e onde cada paciente está internado.</p></div>
+    <div class="acoes-topo">
+      <button class="botao fantasma" id="abrir-bastidores" type="button">Bastidores do Redis <span class="contador" id="conta-eventos"></span></button>
+      <a class="botao secundario" href="/" target="_blank" rel="noopener">Painel de chamada</a>
+      <button class="botao primario" id="novo" type="button">+ Novo paciente</button>
+    </div>
+  </header>
+
+  <div class="segmentado abas" role="radiogroup" aria-label="Seção">
+    <label><input type="radio" name="aba" value="fila" checked><span>Fila de espera <b id="conta-fila" class="contador"></b></span></label>
+    <label><input type="radio" name="aba" value="leitos"><span>Leitos <b id="conta-leitos" class="contador"></b></span></label>
+    <label><input type="radio" name="aba" value="redis"><span>Redis por dentro</span></label>
+  </div>
+
+  <section id="view-fila">
+    <div class="barra">
+      <p class="aviso-chamada" id="aviso" hidden></p>
+      <div class="chamar">
+        <select class="controle" id="sala" aria-label="Sala de atendimento"></select>
+        <button class="botao primario" id="chamar" type="button">Chamar próximo</button>
+      </div>
+    </div>
+    <div class="cartao">
+      <div class="tabela-rolagem"><table class="tabela" id="tab-fila">
+        <thead><tr><th>#</th><th>Paciente</th><th>Prioridade</th><th>Espera</th><th class="acoes"></th></tr></thead>
+        <tbody></tbody>
+      </table></div>
+      <div class="estado-vazio" id="fila-vazia" hidden><strong>Ninguém na fila</strong><span>Use “Novo paciente” para colocar alguém na triagem.</span></div>
+    </div>
+    <div id="bloco-chamados" hidden>
+      <h2 class="subtitulo">Chamados <span class="dica">já foram para a sala; decida se vão para um leito</span></h2>
+      <div class="cartao"><div class="tabela-rolagem"><table class="tabela" id="tab-chamados">
+        <thead><tr><th>Paciente</th><th>Sala</th><th class="acoes"></th></tr></thead>
+        <tbody></tbody>
+      </table></div></div>
+    </div>
+  </section>
+
+  <section id="view-leitos" hidden>
+    <div class="barra">
+      <div class="legenda"><span class="selo gravado" id="l-livres">livres</span><span class="selo recusado" id="l-ocupados">ocupados</span></div>
+      <button class="botao secundario" id="corrida" type="button" title="Duas alocações simultâneas no mesmo leito: o Redis deixa passar só uma">Simular disputa pelo mesmo leito</button>
+    </div>
+    <div class="cartao bloco">
+      <div class="leitos" id="leitos" role="list"></div>
+      <p class="dica">Clique num leito para alocar um paciente ou liberar.</p>
+    </div>
+  </section>
+
+  <section id="view-redis" hidden>
+    <dl class="cartao resumo" id="redis-resumo"></dl>
+    <h2 class="subtitulo">Como os dados estão guardados <span class="dica">atualiza sozinho a cada 3 segundos</span></h2>
+    <div class="grupos" id="redis-grupos"></div>
+    <h2 class="subtitulo">Scripts Lua <span class="dica">cada script roda inteiro, sem que outro comando entre no meio</span></h2>
+    <div class="cartao" id="redis-scripts"></div>
+  </section>
+</main>
+
+<dialog id="dlg-paciente" aria-labelledby="t-paciente">
+  <form id="form-paciente" autocomplete="off" method="dialog">
+    <div class="dlg-topo"><h2 id="t-paciente">Novo paciente</h2></div>
+    <div class="dlg-corpo">
+      <label class="campo">Nome
+        <input class="controle" id="nome" list="cadastro" placeholder="Digite ou escolha do cadastro" required>
+        <datalist id="cadastro"></datalist>
+        <span class="dica" id="dica-cadastro">Procurando o cadastro do Tema 1…</span>
+      </label>
+      <fieldset class="campo prioridade">
+        <legend>Prioridade</legend>
+        <div class="segmentado cinco" id="prio"></div>
+      </fieldset>
+    </div>
+    <div class="dlg-rodape">
+      <button class="botao secundario" type="button" data-fechar>Cancelar</button>
+      <button class="botao primario" type="submit">Colocar na fila</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="dlg-internar" aria-labelledby="t-internar">
+  <div class="dlg-topo"><h2 id="t-internar">Internar em um leito</h2></div>
+  <div class="dlg-corpo">
+    <p id="internar-quem" class="forte"></p>
+    <label class="campo">Leito livre
+      <select class="controle" id="internar-leito"></select>
+    </label>
+  </div>
+  <div class="dlg-rodape">
+    <button class="botao secundario" type="button" data-fechar>Cancelar</button>
+    <button class="botao primario" id="confirmar-internar" type="button">Internar</button>
+  </div>
+</dialog>
+
+<dialog id="dlg-leito" aria-labelledby="t-leito">
+  <div class="dlg-topo"><h2 id="t-leito"></h2></div>
+  <div class="dlg-corpo">
+    <label class="campo" id="leito-form">Paciente
+      <select class="controle" id="leito-paciente"></select>
+    </label>
+    <p id="leito-quem" hidden></p>
+  </div>
+  <div class="dlg-rodape">
+    <button class="botao secundario" type="button" data-fechar>Fechar</button>
+    <button class="botao primario" id="alocar" type="button">Alocar</button>
+    <button class="botao perigo" id="liberar" type="button" hidden>Liberar leito</button>
+  </div>
+</dialog>
+
+<aside class="lateral" id="bastidores" hidden aria-label="Bastidores do Redis">
+  <div class="lateral-topo"><div><h2>Bastidores do Redis</h2><p class="dica">Cada ação, com o que o banco respondeu.</p></div>
+    <button class="botao fantasma sm" type="button" id="fechar-bastidores">Fechar</button></div>
+  <ol class="eventos" id="log"><li class="vazio">As operações aparecem aqui.</li></ol>
+</aside>
+<script src="/static/operacao.js?v=5"></script>
+</body>
+</html>

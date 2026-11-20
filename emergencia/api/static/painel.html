@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Painel de chamada</title>
+<link rel="preload" href="/static/fonts/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="/static/kit.css">
+<style>
+  :root { --tv-fundo: #0B1220; --tv-cartao: #121C2F; --tv-borda: #22304A; --tv-texto: #F8FAFC; --tv-suave: #9FB0C7; --tv-destaque: #2DD4BF; }
+  html, body { height: 100%; }
+  body { background: var(--tv-fundo); color: var(--tv-texto); display: grid; grid-template-rows: auto minmax(0, 1fr) auto; overflow: hidden; }
+  header, footer { display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 20px 4vw; color: var(--tv-suave); font-size: clamp(1rem, 1.6vw, 1.5rem); }
+  header { border-bottom: 1px solid var(--tv-borda); }
+  footer { border-top: 1px solid var(--tv-borda); }
+  .marca-tv { display: flex; align-items: center; gap: 14px; color: var(--tv-texto); font-weight: 700; }
+  .marca-tv .marca-icone { display: grid; place-items: center; width: 2.4em; height: 2.4em; border-radius: 10px; background: var(--destaque); color: #fff; }
+  .marca-tv svg { width: 60%; height: 60%; fill: currentColor; stroke: none; }
+  .relogio { font-weight: 600; font-variant-numeric: tabular-nums; color: var(--tv-texto); }
+  .conexao { display: inline-flex; align-items: center; gap: 10px; }
+  .conexao i { width: .7em; height: .7em; border-radius: 50%; background: #22C55E; box-shadow: 0 0 0 4px rgba(34, 197, 94, .2); }
+  .conexao.off i { background: #EF4444; box-shadow: 0 0 0 4px rgba(239, 68, 68, .2); }
+  main { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); gap: 3vw; padding: 3vw 4vw; min-height: 0; }
+  .agora { background: var(--tv-cartao); border: 1px solid var(--tv-borda); border-radius: 24px; display: grid; align-content: center; justify-items: start; gap: 2vh; padding: 4vw; min-width: 0; }
+  .rotulo { font-size: clamp(1rem, 1.8vw, 1.75rem); letter-spacing: .12em; text-transform: uppercase; color: var(--tv-suave); font-weight: 600; }
+  .nome { font-size: clamp(2.5rem, 8vw, 9rem); font-weight: 800; line-height: 1.05; letter-spacing: -.03em; overflow-wrap: anywhere; }
+  .sala { display: inline-block; font-size: clamp(2rem, 5vw, 6rem); font-weight: 800; padding: .1em .45em; border-radius: .3em; background: var(--tv-destaque); color: #042F2E; }
+  .agora.vazio .nome { color: var(--tv-suave); font-weight: 600; font-size: clamp(2rem, 5vw, 5rem); }
+  .agora.vazio .sala { display: none; }
+  .agora.pisca { animation: pisca 1.2s var(--ease) 3; }
+  @keyframes pisca { 0%, 100% { border-color: var(--tv-borda); box-shadow: none; } 50% { border-color: var(--tv-destaque); box-shadow: 0 0 0 10px rgba(45, 212, 191, .18); } }
+  .historico { display: grid; align-content: start; gap: 2vh; min-width: 0; }
+  .historico ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
+  .historico li { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 1.6vh 1.6vw; background: var(--tv-cartao); border: 1px solid var(--tv-borda); border-radius: 16px; font-size: clamp(1.1rem, 2.2vw, 2.25rem); font-weight: 600; }
+  .historico li span:first-child { min-width: 0; overflow-wrap: anywhere; }
+  .historico li b { color: var(--tv-destaque); white-space: nowrap; }
+  .historico .nada { color: var(--tv-suave); font-weight: 500; background: transparent; border-style: dashed; }
+  .leitos-tv { color: var(--tv-texto); font-weight: 700; }
+  .leitos-tv b { color: var(--tv-destaque); }
+  @media (max-width: 800px) { main { grid-template-columns: 1fr; overflow-y: auto; } body { overflow-y: auto; } }
+  @media (prefers-reduced-motion: reduce) { .agora.pisca { animation: none; } }
+</style>
+</head>
+<body>
+<header>
+  <div class="marca-tv"><span class="marca-icone"><svg viewBox="0 0 24 24"><path d="M9.5 3.5h5v6h6v5h-6v6h-5v-6h-6v-5h6z"/></svg></span><span>Hospital · Triagem</span></div>
+  <span class="relogio" id="relogio"></span>
+</header>
+<main>
+  <section class="agora vazio" id="agora" aria-live="polite" aria-atomic="true">
+    <span class="rotulo">Chamando agora</span>
+    <span class="nome" id="atual">Aguardando próxima chamada</span>
+    <span class="sala" id="sala"></span>
+  </section>
+  <section class="historico">
+    <span class="rotulo">Últimas chamadas</span>
+    <ol id="hist"><li class="nada">Nenhuma chamada ainda</li></ol>
+  </section>
+</main>
+<footer>
+  <span class="leitos-tv" id="leitos">Leitos livres: –</span>
+  <span class="conexao" id="conexao"><i></i><span>Conectado</span></span>
+</footer>
+<script>
+const $ = (id) => document.getElementById(id);
+let historico = [], total = null;
+
+function relogio() { $("relogio").textContent = new Date().toLocaleString("pt-BR", { weekday: "long", hour: "2-digit", minute: "2-digit" }); }
+function leitos(livres) { $("leitos").innerHTML = `Leitos livres: <b>${livres}</b>${total ? ` de ${total}` : ""}`; }
+
+function chamada(m, animar) {
+  historico = [m, ...historico.filter((h) => h.patient !== m.patient)].slice(0, 6);
+  const agora = $("agora");
+  agora.classList.remove("vazio");
+  $("atual").textContent = m.name;
+  $("sala").textContent = m.room;
+  if (animar) { agora.classList.remove("pisca"); void agora.offsetWidth; agora.classList.add("pisca"); }
+  $("hist").innerHTML = historico.slice(1).map((h) => `<li><span></span><b></b></li>`).join("") || '<li class="nada">Nenhuma chamada anterior</li>';
+  [...$("hist").children].forEach((li, i) => { if (!li.classList.contains("nada")) { li.firstChild.textContent = historico[i + 1].name; li.lastChild.textContent = historico[i + 1].room; } });
+}
+
+let pronto = false;
+function conectar() {
+  const ws = new WebSocket((location.protocol === "https:" ? "wss://" : "ws://") + location.host + "/ws/painel");
+  ws.onopen = () => { $("conexao").classList.remove("off"); $("conexao").lastChild.textContent = "Conectado"; setTimeout(() => { pronto = true; }, 600); };
+  ws.onmessage = (e) => {
+    const m = JSON.parse(e.data);
+    if (m.type === "call") chamada(m, pronto);  // o histórico recebido ao conectar não faz piscar
+    else if (m.type === "bed") leitos(m.free);
+  };
+  ws.onclose = () => { pronto = false; $("conexao").classList.add("off"); $("conexao").lastChild.textContent = "Reconectando…"; setTimeout(conectar, 2000); };
+}
+
+fetch("/beds").then((r) => r.json()).then((b) => { total = b.free + b.occupied; leitos(b.free); }).catch(() => {});
+relogio(); setInterval(relogio, 15000);
+conectar();
+</script>
+</body>
+</html>

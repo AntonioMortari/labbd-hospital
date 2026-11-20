@@ -1,0 +1,46 @@
+services:
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "/usr/local/etc/redis/redis.conf"]
+    volumes:
+      - ./redis/redis.conf:/usr/local/etc/redis/redis.conf:ro
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 3s
+      timeout: 2s
+      retries: 10
+    restart: always
+
+  api:
+    build: ./api
+    environment:
+      REDIS_URL: redis://redis:6379/0
+      TOTAL_BEDS: "50"
+    depends_on:
+      redis:
+        condition: service_healthy
+    deploy:
+      replicas: 3
+    restart: always
+
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "8080:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - api
+    restart: always
+
+  loadtest:
+    build: ./loadtest
+    profiles: ["test"]
+    environment:
+      BASE_URL: http://nginx
+    depends_on:
+      - nginx
+
+volumes:
+  redis-data:
