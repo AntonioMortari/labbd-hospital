@@ -28,7 +28,9 @@ A API só executa SQL escrito à mão (sem ORM).
 docker compose up -d --build
 ```
 
-- Página de demo: http://localhost:8081 (agenda, faturas e auditoria, atualizando a cada 2 s)
+- Interface da recepção: http://localhost:8081. Menu com Agenda, Pacientes, Faturas, Auditoria e Banco (diagrama das tabelas, chaves, regras e triggers lidos ao vivo do PostgreSQL, só leitura); formulários
+  abrem numa gaveta lateral; o painel "Bastidores do banco" mostra cada resposta do PostgreSQL (gravado ou recusado,
+  regra e SQLSTATE). No celular, o painel abre pelo botão com o ícone do banco.
 - Documentação da API: http://localhost:8081/docs
 - DBeaver/pgAdmin: host `localhost`, porta `5433`, banco `hospital`, usuário `postgres`, senha `postgres`
 
@@ -42,7 +44,7 @@ docker compose down -v && docker compose up -d --build
 ## Testes
 
 ```bash
-docker compose --profile test run --rm tests                  # 66 testes (banco + API)
+docker compose --profile test run --rm tests                  # 82 testes (banco + API)
 docker compose --profile test run --rm --build loadtest       # corrida: 500 agendamentos simultâneos
 ```
 

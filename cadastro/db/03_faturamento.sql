@@ -21,11 +21,11 @@ BEGIN
     -- são serializadas e a segunda já encontra o status 'realizado'.
     SELECT * INTO v_ag FROM agendamento WHERE id = p_agendamento_id FOR UPDATE;
     IF NOT FOUND THEN
-        RAISE EXCEPTION 'Agendamento % não encontrado', p_agendamento_id USING ERRCODE = 'P0001';
+        RAISE EXCEPTION 'Agendamento % não encontrado', p_agendamento_id USING ERRCODE = 'P0001', CONSTRAINT = 'realizar_atendimento';
     END IF;
     IF v_ag.status <> 'agendado' THEN
         RAISE EXCEPTION 'Agendamento % não pode ser realizado (status: %)', p_agendamento_id, v_ag.status
-            USING ERRCODE = 'P0001';
+            USING ERRCODE = 'P0001', CONSTRAINT = 'realizar_atendimento';
     END IF;
 
     v_data := lower(v_ag.periodo)::date;
@@ -44,7 +44,7 @@ BEGIN
     IF v_pac.plano_id IS NOT NULL THEN
         IF v_pac.validade_carteirinha < v_data THEN
             RAISE EXCEPTION 'Plano do paciente vencido em %', to_char(v_pac.validade_carteirinha, 'DD/MM/YYYY')
-                USING ERRCODE = 'P0001';
+                USING ERRCODE = 'P0001', CONSTRAINT = 'realizar_atendimento';
         END IF;
         SELECT cobertura_pct INTO v_cobertura FROM plano WHERE id = v_pac.plano_id;
     END IF;

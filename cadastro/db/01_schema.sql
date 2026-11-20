@@ -105,7 +105,7 @@ LANGUAGE plpgsql AS $$
 BEGIN
     IF NEW.status IS DISTINCT FROM OLD.status AND OLD.status <> 'agendado' THEN
         RAISE EXCEPTION 'Agendamento % está % e não pode mudar para %', OLD.id, OLD.status, NEW.status
-            USING ERRCODE = 'P0001';
+            USING ERRCODE = 'P0001', CONSTRAINT = 'trg_transicao_status';
     END IF;
     RETURN NEW;
 END;

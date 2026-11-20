@@ -3,6 +3,7 @@
 A API é fina de propósito: as regras (integridade, conflito de horário, auditoria,
 faturamento) são garantidas pelo PostgreSQL. Aqui só há SQL escrito à mão.
 """
+import mimetypes
 import os
 from contextlib import asynccontextmanager
 from datetime import date
@@ -10,10 +11,15 @@ from decimal import Decimal
 
 import asyncpg
 from fastapi import FastAPI, Header, HTTPException, Request
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
+import catalogo
 import db
+
+mimetypes.add_type("font/woff2", ".woff2")  # a imagem slim do Python não conhece .woff2
 
 DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://postgres:postgres@localhost:5433/hospital")
 
@@ -26,13 +32,38 @@ async def lifespan(app):
 
 
 app = FastAPI(title="Tema 1 — Cadastro e Agendamentos", lifespan=lifespan)
+@app.middleware("http")
+async def sem_cache_estatico(request: Request, call_next):
+    """Interface mudou? O navegador revalida em vez de usar uma cópia velha (evita abas que não abrem)."""
+    resposta = await call_next(request)
+    if request.url.path == "/" or request.url.path.startswith("/static/"):
+        resposta.headers["Cache-Control"] = "no-cache"
+    return resposta
+
+
+app.include_router(catalogo.router)
+app.mount("/static", StaticFiles(directory="static"), name="static")
+
+# Interface e API de OUTROS módulos (grafo.localhost, triagem.localhost...) chamam esta API pelo navegador.
+# Só origens em localhost, sem credenciais: nenhum site externo ganha acesso.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origin_regex=r"^https?://([a-z0-9-]+\.)*localhost(:\d+)?$",
+    allow_methods=["GET", "POST", "PUT", "OPTIONS"],
+    allow_headers=["Content-Type", "X-Usuario"],
+)
 
 
 @app.exception_handler(asyncpg.PostgresError)
 @app.exception_handler(asyncpg.DataError)
 async def erro_banco(request: Request, e: Exception):
     http = db.erro_http(e)
-    return JSONResponse(status_code=http.status_code, content={"detail": http.detail})
+    # sqlstate e regra vêm do próprio Postgres: a interface mostra qual regra recusou a operação
+    return JSONResponse(status_code=http.status_code, content={
+        "detail": http.detail,
+        "sqlstate": getattr(e, "sqlstate", None),
+        "regra": getattr(e, "constraint_name", None),
+    })
 
 
 def linha(r) -> dict:

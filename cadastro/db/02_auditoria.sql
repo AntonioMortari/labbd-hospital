@@ -56,7 +56,7 @@ CREATE TRIGGER trg_auditoria_plano
 CREATE FUNCTION fn_auditoria_imutavel() RETURNS trigger
 LANGUAGE plpgsql AS $$
 BEGIN
-    RAISE EXCEPTION 'A auditoria não pode ser alterada (% recusado)', TG_OP USING ERRCODE = 'P0001';
+    RAISE EXCEPTION 'A auditoria não pode ser alterada (% recusado)', TG_OP USING ERRCODE = 'P0001', CONSTRAINT = 'trg_auditoria_imutavel';
 END;
 $$;
 

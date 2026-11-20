@@ -193,3 +193,99 @@ def test_realizar_cancelado_pela_api_422(api):
     r = api.post(f"/agendamentos/{ag['id']}/realizar")
     assert r.status_code == 422
     assert not any(f["agendamento_id"] == ag["id"] for f in api.get("/faturas").json())
+
+
+def test_erro_traz_sqlstate_e_regra_do_banco(api):
+    """A interface mostra qual regra do Postgres recusou a operação."""
+    inicio, fim, base, hora = _horario()
+    med = _medico_id(api)
+    _agendar(api, _paciente(api)["id"], med, inicio, fim)
+    r = _agendar(api, _paciente(api)["id"], med, f"{base}T{hora:02d}:15:00", f"{base}T{hora:02d}:45:00")
+    corpo = r.json()
+    assert corpo["sqlstate"] == "23P01"
+    assert corpo["regra"] == "sem_conflito_medico"
+
+
+def test_erro_de_cpf_traz_regra(api):
+    pac = _paciente(api)
+    r = api.post("/pacientes", json={"nome": "Outro", "cpf": pac["cpf"], "data_nascimento": "1990-01-01"})
+    assert r.json()["sqlstate"] == "23505"
+    assert r.json()["regra"] == "paciente_cpf_key"
+
+
+def test_erro_da_procedure_traz_sqlstate(api):
+    r = api.post("/agendamentos/999999/realizar")
+    assert r.json()["sqlstate"] == "P0001"
+    assert r.json()["regra"] == "realizar_atendimento"
+
+
+def test_arquivos_da_interface(api):
+    for caminho, tipo in (("/static/app.css", "text/css"), ("/static/app.js", "javascript"),
+                          ("/static/fonts/inter-latin.woff2", "font/woff2")):
+        r = api.get(caminho)
+        assert r.status_code == 200, caminho
+        assert tipo in r.headers["content-type"], caminho
+
+
+def test_interface_estrutura(api):
+    html = api.get("/").text
+    for trecho in ('id="bastidores"', 'data-view="agenda"', 'data-view="pacientes"', 'data-view="faturas"',
+                   'data-view="auditoria"', 'id="gaveta-agendamento"', 'id="gaveta-paciente"'):
+        assert trecho in html, trecho
+
+
+def test_cors_permite_outros_modulos_em_localhost(api):
+    """Interfaces dos outros temas (grafo.localhost, triagem.localhost...) chamam esta API pelo navegador."""
+    origem = "http://grafo.localhost:8000"
+    r = api.get("/pacientes", headers={"Origin": origem})
+    assert r.headers.get("access-control-allow-origin") == origem
+
+
+def test_cors_preflight_aceita_post_com_usuario(api):
+    origem = "http://triagem.localhost:8000"
+    r = api.options("/pacientes", headers={"Origin": origem, "Access-Control-Request-Method": "POST",
+                                           "Access-Control-Request-Headers": "content-type,x-usuario"})
+    assert r.status_code == 200
+    assert r.headers["access-control-allow-origin"] == origem
+    assert "x-usuario" in r.headers["access-control-allow-headers"].lower()
+
+
+def test_cors_nao_libera_outros_sites(api):
+    r = api.get("/pacientes", headers={"Origin": "http://site-qualquer.com"})
+    assert "access-control-allow-origin" not in r.headers
+
+
+# ---------------------------------------------------------------- aba Banco (catálogo, somente leitura)
+def test_banco_estrutura_lista_tabelas_e_relacoes(api):
+    d = api.get("/banco/estrutura").json()
+    nomes = {t["nome"] for t in d["tabelas"]}
+    assert {"paciente", "medico", "agendamento", "fatura", "auditoria", "plano", "convenio", "especialidade"} <= nomes
+    pares = {(r["de"], r["para"]) for r in d["relacoes"]}
+    assert {("agendamento", "paciente"), ("agendamento", "medico"), ("fatura", "agendamento"), ("paciente", "plano")} <= pares
+    ag = next(t for t in d["tabelas"] if t["nome"] == "agendamento")
+    assert next(c for c in ag["colunas"] if c["nome"] == "id")["pk"]
+    assert next(c for c in ag["colunas"] if c["nome"] == "medico_id")["fk"] == {"tabela": "medico", "coluna": "id"}
+    assert {"sem_conflito_medico", "sem_conflito_paciente"} <= {r["nome"] for r in ag["restricoes"] if r["tipo"] == "EXCLUDE"}
+    assert any(g["nome"] == "trg_transicao_status" and g["momento"] == "BEFORE" for g in ag["triggers"])
+
+
+def test_banco_estrutura_rotinas_sem_funcoes_de_extensao(api):
+    nomes = {r["nome"]: r["tipo"] for r in api.get("/banco/estrutura").json()["rotinas"]}
+    assert nomes["realizar_atendimento"] == "procedure"
+    assert nomes["fn_auditoria"] == "trigger"
+    assert not any(n.startswith("gbt_") for n in nomes)
+
+
+def test_banco_dados_de_uma_tabela(api):
+    r = api.get("/banco/tabelas/medico/dados", params={"limit": 3})
+    assert r.status_code == 200
+    assert 1 <= len(r.json()["linhas"]) <= 3
+
+
+@pytest.mark.parametrize("nome", ["pg_user", "nao_existe", 'paciente" or 1=1 --', "information_schema.tables"])
+def test_banco_dados_recusa_tabela_fora_do_catalogo(api, nome):
+    assert api.get(f"/banco/tabelas/{nome}/dados").status_code == 404
+
+
+def test_banco_dados_limite_invalido(api):
+    assert api.get("/banco/tabelas/medico/dados", params={"limit": 100000}).status_code == 422

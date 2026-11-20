@@ -3,102 +3,187 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Cadastro e Agendamentos</title>
-<style>
-  :root { --bg:#f6f7f9; --card:#fff; --txt:#1c2430; --sub:#5b6676; --linha:#e3e7ec;
-          --agendado:#2563eb; --realizado:#15803d; --cancelado:#9ca3af; --destaque:#fff7d6; }
-  @media (prefers-color-scheme: dark) {
-    :root { --bg:#0f141b; --card:#171e27; --txt:#e6ebf1; --sub:#9aa6b5; --linha:#263040;
-            --agendado:#60a5fa; --realizado:#4ade80; --cancelado:#6b7280; --destaque:#2b2a12; }
-  }
-  * { box-sizing: border-box; }
-  body { margin:0; padding:24px 16px; background:var(--bg); color:var(--txt);
-         font:15px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
-  header { max-width:1200px; margin:0 auto 16px; }
-  h1 { font-size:22px; margin:0 0 4px; }
-  header p { margin:0; color:var(--sub); }
-  main { max-width:1200px; margin:0 auto; display:grid; gap:16px; grid-template-columns:1fr; }
-  @media (min-width: 980px) { main { grid-template-columns: 3fr 2fr; } #auditoria-card { grid-column: 1 / -1; } }
-  section { background:var(--card); border:1px solid var(--linha); border-radius:10px; padding:14px 16px; overflow-x:auto; }
-  h2 { font-size:16px; margin:0 0 10px; }
-  table { width:100%; border-collapse:collapse; font-size:14px; }
-  th, td { text-align:left; padding:6px 8px; border-bottom:1px solid var(--linha); white-space:nowrap; }
-  th { color:var(--sub); font-weight:600; }
-  td.num { text-align:right; font-variant-numeric: tabular-nums; }
-  .st { font-weight:600; }
-  .st.agendado { color:var(--agendado); } .st.realizado { color:var(--realizado); } .st.cancelado { color:var(--cancelado); }
-  tr.novo { background:var(--destaque); }
-  code { font-size:12px; color:var(--sub); white-space:normal; }
-  .vazio { color:var(--sub); }
-</style>
+<title>Recepção · Hospital</title>
+<link rel="preload" href="/static/fonts/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="/static/app.css?v=banco">
+<script src="/static/embed.js"></script>
 </head>
 <body>
-<header>
-  <h1>Tema 1 · Cadastro, Agendamentos e Faturamento</h1>
-  <p>Atualiza a cada 2 segundos · <span id="hora">—</span></p>
-</header>
-<main>
-  <section>
-    <h2>Agenda</h2>
-    <table id="agenda"><thead><tr><th>#</th><th>Início</th><th>Paciente</th><th>Médico</th><th>Tipo</th><th>Status</th></tr></thead><tbody></tbody></table>
-  </section>
-  <section>
-    <h2>Faturas</h2>
-    <table id="faturas"><thead><tr><th>#</th><th>Paciente</th><th class="num">Total</th><th class="num">Convênio</th><th class="num">Paciente</th></tr></thead><tbody></tbody></table>
-  </section>
-  <section id="auditoria-card">
-    <h2>Auditoria (últimas alterações)</h2>
-    <table id="auditoria"><thead><tr><th>Quando</th><th>Usuário</th><th>Tabela</th><th>Operação</th><th>Registro</th><th>O que mudou</th></tr></thead><tbody></tbody></table>
-  </section>
-</main>
-<script>
-const esc = v => String(v ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
-const brl = v => Number(v).toLocaleString("pt-BR", {style:"currency", currency:"BRL"});
-const quando = v => new Date(v).toLocaleString("pt-BR", {dateStyle:"short", timeStyle:"short"});
-const vistos = {agenda:new Set(), faturas:new Set(), auditoria:new Set()};
-let primeira = true;
+<svg width="0" height="0" class="sprite" aria-hidden="true">
+  <defs>
+    <symbol id="i-calendario" viewBox="0 0 24 24"><rect x="3" y="4.5" width="18" height="16" rx="2.5"/><path d="M3 9.5h18M8 2.5v4M16 2.5v4"/></symbol>
+    <symbol id="i-pessoas" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.6-3.6 3.3-5.5 6.5-5.5s5.9 1.9 6.5 5.5"/><path d="M16 4.6a3.5 3.5 0 0 1 0 6.8M18 14.8c2 .7 3.2 2.4 3.5 5.2"/></symbol>
+    <symbol id="i-fatura" viewBox="0 0 24 24"><path d="M6 2.5h12v19l-3-2-3 2-3-2-3 2z"/><path d="M9 8h6M9 12h6M9 16h3"/></symbol>
+    <symbol id="i-historico" viewBox="0 0 24 24"><path d="M3.5 12a8.5 8.5 0 1 0 2.6-6.1"/><path d="M3 3.5v4h4"/><path d="M12 7.5V12l3 2"/></symbol>
+    <symbol id="i-banco" viewBox="0 0 24 24"><ellipse cx="12" cy="5.5" rx="7.5" ry="3"/><path d="M4.5 5.5v13c0 1.7 3.4 3 7.5 3s7.5-1.3 7.5-3v-13"/><path d="M4.5 12c0 1.7 3.4 3 7.5 3s7.5-1.3 7.5-3"/></symbol>
+    <symbol id="i-mais" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+    <symbol id="i-fechar" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></symbol>
+    <symbol id="i-ok" viewBox="0 0 24 24"><path d="m5 12.5 4.5 4.5L19 7.5"/></symbol>
+    <symbol id="i-alerta" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7.5v5.5M12 16.5v.5"/></symbol>
+    <symbol id="i-cruz" viewBox="0 0 24 24"><path d="M9.5 3.5h5v6h6v5h-6v6h-5v-6h-6v-5h6z"/></symbol>
+  </defs>
+</svg>
 
-function preencher(id, itens, chave, linha) {
-  const tbody = document.querySelector(`#${id} tbody`);
-  if (!itens.length) { tbody.innerHTML = `<tr><td colspan="6" class="vazio">Nada por aqui ainda.</td></tr>`; return; }
-  tbody.innerHTML = itens.map(it => {
-    const novo = !primeira && !vistos[id].has(chave(it));
-    return `<tr${novo ? ' class="novo"' : ""}>${linha(it)}</tr>`;
-  }).join("");
-  itens.forEach(it => vistos[id].add(chave(it)));
-}
+<div class="app">
+  <aside class="menu" aria-label="Navegação principal">
+    <div class="marca">
+      <span class="marca-icone"><svg><use href="#i-cruz"/></svg></span>
+      <span class="marca-texto"><strong>Hospital</strong><span>Recepção · Tema 1</span></span>
+    </div>
+    <nav class="nav">
+      <a class="nav-item" href="#/agenda" data-view="agenda"><svg><use href="#i-calendario"/></svg><span>Agenda</span><span class="contador" id="conta-agenda"></span></a>
+      <a class="nav-item" href="#/pacientes" data-view="pacientes"><svg><use href="#i-pessoas"/></svg><span>Pacientes</span><span class="contador" id="conta-pacientes"></span></a>
+      <a class="nav-item" href="#/faturas" data-view="faturas"><svg><use href="#i-fatura"/></svg><span>Faturas</span><span class="contador" id="conta-faturas"></span></a>
+      <a class="nav-item" href="#/auditoria" data-view="auditoria"><svg><use href="#i-historico"/></svg><span>Auditoria</span><span class="contador" id="conta-auditoria"></span></a>
+      <a class="nav-item" href="#/banco" data-view="banco"><svg><use href="#i-banco"/></svg><span>Banco</span></a>
+    </nav>
+    <label class="guiche">
+      <span>Atendente</span>
+      <select id="usuario" class="controle">
+        <option value="carla">Carla · recepção</option>
+        <option value="pedro">Pedro · recepção</option>
+      </select>
+      <small>Quem está atendendo agora. Aparece na Auditoria ao lado de cada alteração.</small>
+    </label>
+    <button class="botao secundario abrir-bastidores" id="abrir-bastidores" type="button" aria-label="Abrir bastidores do banco">
+      <svg><use href="#i-banco"/></svg><span class="rotulo-bastidores">Bastidores</span><span class="contador" id="conta-eventos"></span>
+    </button>
+  </aside>
 
-function diferenca(a) {
-  if (a.operacao === "INSERT") return "cadastro novo";
-  if (a.operacao === "DELETE") return "registro apagado";
-  const antes = a.dados_antigos || {}, depois = a.dados_novos || {};
-  return Object.keys(depois).filter(k => JSON.stringify(antes[k]) !== JSON.stringify(depois[k]))
-    .map(k => `${k}: ${esc(antes[k])} → ${esc(depois[k])}`).join("; ");
-}
+  <main class="principal">
+    <section class="view" id="view-agenda" data-titulo="Agenda">
+      <header class="cabecalho">
+        <div><h1>Agenda</h1><p>Consultas e cirurgias a partir de hoje.</p></div>
+        <button class="botao primario" type="button" data-abrir="agendamento"><svg><use href="#i-mais"/></svg>Novo agendamento</button>
+      </header>
+      <div class="barra-filtro">
+        <label class="campo-inline">Médico
+          <select id="filtro-medico" class="controle"><option value="">Todos</option></select>
+        </label>
+      </div>
+      <div class="cartao"><div id="agenda" class="tabela-rolagem"></div></div>
+    </section>
 
-async function atualizar() {
-  try {
-    const [ag, fat, aud] = await Promise.all(["/agendamentos", "/faturas", "/auditoria?limit=10"]
-      .map(u => fetch(u).then(r => r.json())));
-    const hoje = new Date(); hoje.setHours(0, 0, 0, 0);
-    const proximos = ag.filter(a => new Date(a.inicio) >= hoje).slice(0, 15);
-    preencher("agenda", proximos, a => a.id + a.status, a =>
-      `<td>${a.id}</td><td>${quando(a.inicio)}</td><td>${esc(a.paciente)}</td><td>${esc(a.medico)}</td>` +
-      `<td>${esc(a.tipo)}</td><td class="st ${esc(a.status)}">${esc(a.status)}</td>`);
-    preencher("faturas", fat.slice(0, 10), f => f.id, f =>
-      `<td>${f.id}</td><td>${esc(f.paciente)}</td><td class="num">${brl(f.valor_total)}</td>` +
-      `<td class="num">${brl(f.valor_convenio)}</td><td class="num">${brl(f.valor_paciente)}</td>`);
-    preencher("auditoria", aud, a => a.id, a =>
-      `<td>${quando(a.em)}</td><td>${esc(a.usuario)}</td><td>${esc(a.tabela)}</td><td>${esc(a.operacao)}</td>` +
-      `<td>${a.registro_id}</td><td><code>${diferenca(a)}</code></td>`);
-    primeira = false;
-    document.getElementById("hora").textContent = "atualizado " + new Date().toLocaleTimeString("pt-BR");
-  } catch (e) {
-    document.getElementById("hora").textContent = "sem conexão com a API";
-  }
-}
-atualizar();
-setInterval(atualizar, 2000);
-</script>
+    <section class="view" id="view-pacientes" data-titulo="Pacientes" hidden>
+      <header class="cabecalho">
+        <div><h1>Pacientes</h1><p>Cadastro com plano de saúde ou particular.</p></div>
+        <button class="botao primario" type="button" data-abrir="paciente"><svg><use href="#i-mais"/></svg>Novo paciente</button>
+      </header>
+      <div class="cartao"><div id="pacientes-tabela" class="tabela-rolagem"></div></div>
+    </section>
+
+    <section class="view" id="view-faturas" data-titulo="Faturas" hidden>
+      <header class="cabecalho">
+        <div><h1>Faturas</h1><p>Emitidas pela procedure <code>realizar_atendimento</code>, na mesma transação do atendimento.</p></div>
+      </header>
+      <div class="cartao">
+        <dl class="resumo" id="resumo-faturas"></dl>
+        <div id="faturas" class="tabela-rolagem"></div>
+      </div>
+    </section>
+
+    <section class="view" id="view-auditoria" data-titulo="Auditoria" hidden>
+      <header class="cabecalho">
+        <div><h1>Auditoria</h1><p>Gravada pelo trigger <code>fn_auditoria</code>. A trilha não pode ser alterada nem apagada.</p></div>
+      </header>
+      <div class="cartao"><div id="auditoria" class="tabela-rolagem"></div></div>
+    </section>
+
+    <section class="view" id="view-banco" data-titulo="Banco" hidden>
+      <header class="cabecalho">
+        <div><h1>Banco de dados</h1><p>Estrutura lida ao vivo do PostgreSQL: tabelas, chaves, regras e triggers. Só leitura.</p></div>
+        <button class="botao secundario" type="button" id="banco-atualizar">Atualizar</button>
+      </header>
+      <dl class="cartao resumo" id="banco-resumo"></dl>
+      <div class="cartao diagrama-caixa" id="banco-diagrama" aria-label="Diagrama das tabelas e relações"></div>
+      <div class="cartao" id="banco-detalhe" hidden>
+        <div class="detalhe-topo">
+          <div><h2 id="banco-titulo"></h2><p class="dica" id="banco-sub"></p></div>
+          <div class="segmentado tres" role="radiogroup" aria-label="Seção da tabela">
+            <label><input type="radio" name="banco-aba" value="colunas" checked><span>Colunas</span></label>
+            <label><input type="radio" name="banco-aba" value="regras"><span>Regras</span></label>
+            <label><input type="radio" name="banco-aba" value="dados"><span>Dados</span></label>
+          </div>
+        </div>
+        <div id="banco-painel" class="tabela-rolagem"></div>
+      </div>
+      <div class="cartao" id="banco-rotinas" hidden></div>
+    </section>
+  </main>
+
+  <aside class="bastidores" id="bastidores" aria-labelledby="titulo-bastidores">
+    <header class="bastidores-topo">
+      <div class="bastidores-titulo">
+        <span class="bastidores-icone"><svg><use href="#i-banco"/></svg></span>
+        <div><h2 id="titulo-bastidores">Bastidores do banco</h2><p><span class="ao-vivo" id="ao-vivo"></span><span id="estado-conexao">Respostas do PostgreSQL</span></p></div>
+      </div>
+      <button class="botao fantasma icone-so fechar-bastidores" type="button" aria-label="Fechar bastidores"><svg><use href="#i-fechar"/></svg></button>
+    </header>
+    <p class="vazio" id="eventos-vazio">Nenhuma operação ainda. Cadastre, agende ou realize um atendimento para ver aqui o que o banco respondeu.</p>
+    <ol class="eventos" id="eventos" aria-live="polite"></ol>
+  </aside>
+</div>
+
+<div class="fundo-gaveta" id="fundo-gaveta" hidden></div>
+
+<aside class="gaveta" id="gaveta-paciente" role="dialog" aria-modal="true" aria-labelledby="titulo-gaveta-paciente" hidden>
+  <form id="form-paciente" autocomplete="off" novalidate>
+    <header class="gaveta-topo">
+      <h2 id="titulo-gaveta-paciente">Novo paciente</h2>
+      <button class="botao fantasma icone-so" type="button" data-fechar aria-label="Fechar"><svg><use href="#i-fechar"/></svg></button>
+    </header>
+    <div class="gaveta-corpo">
+      <div class="alerta" role="alert" hidden></div>
+      <label class="campo">Nome completo<input class="controle" name="nome" required></label>
+      <div class="dupla">
+        <label class="campo">CPF<input class="controle" name="cpf" inputmode="numeric" placeholder="Somente números"></label>
+        <label class="campo">Nascimento<input class="controle" name="data_nascimento" type="date"></label>
+      </div>
+      <label class="campo">Telefone<input class="controle" name="telefone" placeholder="(19) 99999-0000"></label>
+      <label class="campo">Plano de saúde<select class="controle" name="plano_id" id="sel-plano"><option value="">Particular</option></select></label>
+      <div class="dupla">
+        <label class="campo">Carteirinha<input class="controle" name="carteirinha"></label>
+        <label class="campo">Validade<input class="controle" name="validade_carteirinha" type="date"></label>
+      </div>
+      <p class="dica">Com plano, carteirinha e validade são obrigatórias: o banco confere isso com a regra <code>plano_completo</code>.</p>
+    </div>
+    <footer class="gaveta-rodape">
+      <button class="botao secundario" type="button" data-fechar>Cancelar</button>
+      <button class="botao primario" type="submit">Cadastrar paciente</button>
+    </footer>
+  </form>
+</aside>
+
+<aside class="gaveta" id="gaveta-agendamento" role="dialog" aria-modal="true" aria-labelledby="titulo-gaveta-agendamento" hidden>
+  <form id="form-agendamento" autocomplete="off" novalidate>
+    <header class="gaveta-topo">
+      <h2 id="titulo-gaveta-agendamento">Novo agendamento</h2>
+      <button class="botao fantasma icone-so" type="button" data-fechar aria-label="Fechar"><svg><use href="#i-fechar"/></svg></button>
+    </header>
+    <div class="gaveta-corpo">
+      <div class="alerta" role="alert" hidden></div>
+      <label class="campo">Paciente<select class="controle" name="paciente_id" id="sel-paciente"></select></label>
+      <label class="campo">Médico<select class="controle" name="medico_id" id="sel-medico"></select></label>
+      <div class="segmentado" role="radiogroup" aria-label="Tipo">
+        <label><input type="radio" name="tipo" value="consulta" checked><span>Consulta</span></label>
+        <label><input type="radio" name="tipo" value="cirurgia"><span>Cirurgia</span></label>
+      </div>
+      <label class="campo" id="campo-valor" hidden>Valor da cirurgia (R$)<input class="controle" name="valor_cirurgia" type="number" min="1" step="0.01"></label>
+      <label class="campo">Dia<input class="controle" name="dia" type="date"></label>
+      <div class="dupla">
+        <label class="campo">Início<input class="controle" name="inicio" type="time" step="900"></label>
+        <label class="campo">Fim<input class="controle" name="fim" type="time" step="900"></label>
+      </div>
+      <p class="dica">O banco recusa horários sobrepostos do mesmo médico ou paciente (<code>sem_conflito_medico</code>, <code>sem_conflito_paciente</code>).</p>
+    </div>
+    <footer class="gaveta-rodape">
+      <button class="botao secundario" type="button" data-fechar>Cancelar</button>
+      <button class="botao primario" type="submit">Agendar</button>
+    </footer>
+  </form>
+</aside>
+
+<script src="/static/app.js?v=banco"></script>
+<script src="/static/banco.js?v=banco"></script>
 </body>
 </html>

@@ -1,0 +1,14 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "overused-font",
+        "value": "inter",
+        "createdAt": "2026-11-20T00:31:34.937Z",
+        "reason": "Inter consta no design do redesign aprovado pelo usuário em 19/11 (interface convencional e limpa)"
+      }
+    ]
+  }
+}
