@@ -1,0 +1,81 @@
+{
+  "gateway": {
+    "porta": 8000
+  },
+  "modulos": [
+    {
+      "id": "cadastro",
+      "tema": 1,
+      "pasta": "cadastro",
+      "porta": 8081,
+      "nome": "Cadastro, Equipe Médica e Agendamentos",
+      "banco": "PostgreSQL",
+      "tipo": "Relacional (SQL)",
+      "responsaveis": [
+        "Yuri",
+        "Antônio"
+      ],
+      "curto": "Cadastro",
+      "entrada": "/"
+    },
+    {
+      "id": "grafo",
+      "tema": 2,
+      "pasta": "grafo",
+      "porta": 8082,
+      "nome": "Interações Medicamentosas e Rede de Contágio",
+      "banco": "Banco de grafos",
+      "tipo": "Grafos",
+      "responsaveis": [
+        "João Abilla"
+      ],
+      "curto": "Interações",
+      "entrada": "/"
+    },
+    {
+      "id": "triagem",
+      "tema": 3,
+      "pasta": "emergencia",
+      "porta": 8080,
+      "nome": "Fila de Triagem, Leitos e Cache Operacional",
+      "banco": "Redis",
+      "tipo": "Chave-valor",
+      "responsaveis": [
+        "Stéfano Ferrari"
+      ],
+      "curto": "Triagem",
+      "entrada": "/operacao"
+    },
+    {
+      "id": "prontuario",
+      "tema": 4,
+      "pasta": "prontuario",
+      "porta": 8084,
+      "nome": "Prontuário Eletrônico do Paciente (PEP)",
+      "banco": "Banco de documentos",
+      "tipo": "Documentos",
+      "responsaveis": [
+        "Gustavo"
+      ],
+      "curto": "Prontuário",
+      "entrada": "/"
+    },
+    {
+      "id": "sinais",
+      "tema": 5,
+      "pasta": "sinais",
+      "porta": 8085,
+      "nome": "Monitoramento de Sinais Vitais IoT",
+      "banco": "Banco de série temporal",
+      "tipo": "Série temporal",
+      "responsaveis": [
+        "Ricardo",
+        "Felipe Batista",
+        "Daiane",
+        "Brun"
+      ],
+      "curto": "Sinais vitais",
+      "entrada": "/"
+    }
+  ]
+}

@@ -1,0 +1,17 @@
+name: labbd-gateway
+
+# Gateway do sistema completo. Os módulos continuam rodando nos próprios compose e portas;
+# o gateway só os alcança pelo host (host.docker.internal), então não toca em nada deles.
+services:
+  gateway:
+    image: nginx:alpine
+    ports:
+      - "${GATEWAY_PORTA:-8000}:80"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ../modulos.json:/etc/nginx/modulos.json:ro
+      - ./hub:/usr/share/nginx/html:ro
+      - ./kit:/usr/share/nginx/kit:ro
+    restart: unless-stopped

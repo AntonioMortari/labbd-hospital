@@ -1,0 +1,10 @@
+# MÓDULO-MODELO: copie esta pasta para a pasta do seu tema (ex.: grafo/, prontuario/, sinais/) e troque o serviço
+# "web" pela sua aplicação + banco. O que não pode mudar: a porta (veja modulos.json) e o /health.
+services:
+  web:
+    image: nginx:alpine
+    ports:
+      - "${PORTA:-8085}:80"          # troque pela porta do seu tema em modulos.json
+    volumes:
+      - ./default.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./index.html:/usr/share/nginx/html/index.html:ro
