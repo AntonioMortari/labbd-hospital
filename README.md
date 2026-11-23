@@ -12,7 +12,7 @@ Cinco módulos, cada um com um tipo de banco de dados:
 | 4 | Prontuário Eletrônico (PEP) | `prontuario/` | documentos | Gustavo |
 | 5 | Monitoramento de Sinais Vitais | `sinais/` | série temporal | Ricardo, Felipe Batista, Daiane e Brun |
 
-Neste repositório estão `cadastro/` e `emergencia/` (Tema 3, do Stéfano). As outras entram como pastas irmãs, no mesmo formato.
+Neste repositório estão `cadastro/`, `grafo/` (Tema 2, do João), `emergencia/` (Tema 3, do Stéfano) e `prontuario/` (Tema 4, do Gustavo). As outras entram como pastas irmãs, no mesmo formato.
 
 ## Sistema completo
 

@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Prontuário eletrônico</title>
+<link rel="preload" href="/static/fonts/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="/static/kit.css">
+<link rel="stylesheet" href="/static/prontuario.css?v=1">
+<script src="/static/embed.js"></script>
+</head>
+<body>
+<main class="tela">
+  <header class="cabecalho">
+    <div><h1>Prontuário eletrônico</h1><p>Um documento por paciente, com evoluções, exames e prescrições. Toda alteração guarda a versão anterior (MongoDB).</p></div>
+    <div class="acoes-topo">
+      <button class="botao fantasma" id="abrir-bastidores" type="button">Bastidores do MongoDB <span class="contador" id="conta-eventos"></span></button>
+      <button class="botao secundario" id="exemplos" type="button">Carregar exemplos</button>
+      <button class="botao primario" id="novo" type="button">+ Novo prontuário</button>
+    </div>
+  </header>
+
+  <div class="barra">
+    <label class="campo-inline">Paciente <select class="controle" id="sel-paciente"></select></label>
+    <div class="segmentado abas" role="radiogroup" aria-label="Seção">
+      <label><input type="radio" name="aba" value="prontuario" checked><span>Prontuário</span></label>
+      <label><input type="radio" name="aba" value="versoes"><span>Versões</span></label>
+      <label><input type="radio" name="aba" value="mongo"><span>MongoDB por dentro</span></label>
+    </div>
+  </div>
+
+  <section id="view-prontuario">
+    <div id="conteudo"></div>
+  </section>
+  <section id="view-versoes" hidden><div id="versoes"></div></section>
+  <section id="view-mongo" hidden><div id="mongo"></div></section>
+</main>
+
+<dialog id="dlg" aria-labelledby="dlg-titulo">
+  <form id="dlg-form" autocomplete="off" novalidate>
+    <div class="dlg-topo"><h2 id="dlg-titulo"></h2></div>
+    <div class="dlg-corpo">
+      <div class="alerta" id="dlg-erro" role="alert" hidden></div>
+      <div id="dlg-campos" class="campos-dlg"></div>
+      <div id="dlg-auditoria" class="campos-dlg auditoria">
+        <label class="campo">Responsável pela alteração <select class="controle" id="f-responsavel"></select></label>
+        <label class="campo">Justificativa <span class="dica">fica registrada na auditoria e não pode ser apagada</span>
+          <textarea class="controle area" id="f-justificativa" rows="2" placeholder="ex.: Correção de informação clínica"></textarea></label>
+      </div>
+    </div>
+    <div class="dlg-rodape">
+      <button class="botao secundario" type="button" data-fechar>Cancelar</button>
+      <button class="botao primario" type="submit" id="dlg-ok">Salvar</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="dlg-versao" aria-labelledby="dv-titulo">
+  <div class="dlg-topo"><h2 id="dv-titulo"></h2></div>
+  <div class="dlg-corpo"><pre class="codigo" id="dv-json"></pre></div>
+  <div class="dlg-rodape"><button class="botao secundario" type="button" data-fechar>Fechar</button></div>
+</dialog>
+
+<aside class="lateral" id="bastidores" hidden aria-label="Bastidores do MongoDB">
+  <div class="lateral-topo"><div><h2>Bastidores do MongoDB</h2><p class="dica">Cada chamada, com o que o banco fez.</p></div>
+    <button class="botao fantasma sm" type="button" id="fechar-bastidores">Fechar</button></div>
+  <ol class="eventos" id="log"><li class="vazio">As operações aparecem aqui.</li></ol>
+</aside>
+<script src="/static/prontuario.js?v=1"></script>
+</body>
+</html>

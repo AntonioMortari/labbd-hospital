@@ -1,0 +1,43 @@
+# Tema 4: Prontuário Eletrônico do Paciente (banco de documentos: MongoDB). Módulo independente do sistema.
+# A API publica a porta 8084 (modulos.json). O banco restaura o backup do Gustavo na primeira subida.
+name: prontuario
+services:
+  mongodb:
+    image: mongo:8.0
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: demonstracao123   # só para demonstração
+    volumes:
+      - mongo-data:/data/db
+      - ./db/dump:/dump:ro
+      - ./db/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      # saudável só depois que o backup foi restaurado (a coleção prontuarios existe)
+      test: ["CMD-SHELL", "mongosh --quiet -u admin -p demonstracao123 --authenticationDatabase admin --eval \"quit(db.getSiblingDB('prontuario_medico').getCollectionNames().includes('prontuarios') ? 0 : 1)\""]
+      interval: 5s
+      timeout: 10s
+      retries: 30
+    restart: unless-stopped
+
+  api:
+    build: ./api
+    environment:
+      MONGO_URI: mongodb://admin:demonstracao123@mongodb:27017/?authSource=admin
+      MONGO_DB: prontuario_medico
+    ports:
+      - "8084:8000"
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    restart: unless-stopped
+
+  tests:
+    build: ./tests
+    profiles: ["test"]
+    environment:
+      BASE_URL: http://api:8000
+    depends_on:
+      - api
+
+volumes:
+  mongo-data:
