@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Interações e rede de contato</title>
+<link rel="preload" href="/static/fonts/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="/static/kit.css">
+<link rel="stylesheet" href="/static/grafo.css?v=3">
+<script src="/static/embed.js"></script>
+</head>
+<body>
+<main class="tela">
+  <header class="cabecalho">
+    <div><h1>Interações e rede de contato</h1><p>Pacientes, medicamentos, patologias e profissionais ligados num grafo (Neo4j). Os riscos saem de percorrer as ligações.</p></div>
+    <div class="acoes-topo">
+      <button class="botao fantasma" id="abrir-bastidores" type="button">Bastidores do Neo4j <span class="contador" id="conta-eventos"></span></button>
+      <a class="botao secundario" href="http://localhost:7474" target="_blank" rel="noopener">Neo4j Browser</a>
+    </div>
+  </header>
+
+  <div class="segmentado abas" role="radiogroup" aria-label="Seção">
+    <label><input type="radio" name="aba" value="riscos" checked><span>Riscos</span></label>
+    <label><input type="radio" name="aba" value="rede"><span>Rede</span></label>
+    <label><input type="radio" name="aba" value="cadastrar"><span>Cadastrar</span></label>
+    <label><input type="radio" name="aba" value="sql"><span>Grafo vs SQL</span></label>
+  </div>
+
+  <section id="view-riscos">
+    <div class="barra">
+      <label class="campo-inline">Paciente <select class="controle" id="sel-paciente"></select></label>
+      <span class="dica" id="resumo-risco"></span>
+    </div>
+    <div id="riscos"></div>
+  </section>
+
+  <section id="view-rede" hidden>
+    <div class="cartao rede-caixa">
+      <div class="legenda-rede" id="legenda-rede"></div>
+      <div id="rede"></div>
+      <p class="dica" id="rede-info">Clique num nó para destacar as ligações dele.</p>
+    </div>
+  </section>
+
+  <section id="view-cadastrar" hidden>
+    <div class="duas">
+      <div class="cartao bloco">
+        <h2>Dados</h2>
+        <p class="dica">Comece por aqui: a demonstração monta um cenário completo; a importação traz os pacientes do cadastro (Tema 1).</p>
+        <div class="linha-botoes">
+          <button class="botao primario" id="demo" type="button">Carregar demonstração</button>
+          <button class="botao secundario" id="importar" type="button">Importar pacientes do cadastro</button>
+        </div>
+        <div class="linha-botoes"><button class="botao perigo" id="limpar" type="button">Limpar o grafo</button></div>
+        <p class="aviso-ok" id="msg" hidden></p>
+      </div>
+      <form class="cartao bloco" id="form-no" autocomplete="off">
+        <h2>Novo nó</h2>
+        <label class="campo">Tipo <select class="controle" id="no-tipo"></select></label>
+        <div class="dupla">
+          <label class="campo">Código<input class="controle" id="no-id" required placeholder="ex.: m6"></label>
+          <label class="campo">Nome<input class="controle" id="no-nome" required></label>
+        </div>
+        <div class="linha-botoes"><button class="botao primario" type="submit">Criar nó</button></div>
+      </form>
+      <form class="cartao bloco largo" id="form-rel" autocomplete="off">
+        <h2>Nova relação</h2>
+        <label class="campo">Relação <select class="controle" id="rel-tipo"></select></label>
+        <div class="dupla">
+          <label class="campo" id="rel-o">Origem <select class="controle" id="rel-origem"></select></label>
+          <label class="campo" id="rel-d">Destino <select class="controle" id="rel-destino"></select></label>
+        </div>
+        <label class="campo">Observação <input class="controle" id="rel-obs" placeholder="opcional"></label>
+        <div class="linha-botoes"><button class="botao primario" type="submit">Ligar</button></div>
+      </form>
+    </div>
+  </section>
+
+  <section id="view-sql" hidden>
+    <div class="cartao bloco">
+      <h2>A mesma pergunta, de dois jeitos</h2>
+      <p class="pergunta">“Este paciente toma remédios que interagem entre si?”</p>
+      <p class="porque">No grafo, você começa no paciente e <b>segue as ligações</b>. No SQL, a informação está espalhada em tabelas e é preciso <b>juntar (JOIN)</b> uma com a outra.</p>
+    </div>
+    <div class="comparacao">
+      <div class="cartao bloco">
+        <div class="topo-lado"><span class="selo gravado sem-ponto">Grafo · Cypher</span><span class="num">1 caminho</span></div>
+        <ol class="passos">
+          <li>Parte do <b>paciente</b>.</li>
+          <li>Segue <code>USA</code> até um <b>remédio</b>.</li>
+          <li>Segue <code>INTERAGE_COM</code> até outro remédio.</li>
+          <li>Confere que o <b>mesmo paciente</b> também usa esse outro remédio.</li>
+        </ol>
+        <pre class="codigo" id="cy-interacao"></pre>
+      </div>
+      <div class="cartao bloco">
+        <div class="topo-lado"><span class="selo aviso sem-ponto">Relacional · SQL</span><span class="num">4 junções</span></div>
+        <ol class="passos">
+          <li>Lê a tabela <code>uso</code> duas vezes: um remédio e outro do mesmo paciente.</li>
+          <li>Junta com <code>medicamento</code> duas vezes, para obter os nomes.</li>
+          <li>Junta com <code>interacao</code>, olhando os dois sentidos do par.</li>
+          <li>Filtra pelo paciente.</li>
+        </ol>
+        <pre class="codigo" id="sql-interacao"></pre>
+      </div>
+    </div>
+    <p class="dica nota">Nenhum tempo foi medido aqui. Para comparar velocidade de verdade seria preciso o mesmo volume de dados nos dois bancos, com índices equivalentes e muitas repetições. O SQL completo está em <code>grafo/comparacao.sql</code>.</p>
+  </section>
+</main>
+
+<aside class="lateral" id="bastidores" hidden aria-label="Bastidores do Neo4j">
+  <div class="lateral-topo"><div><h2>Bastidores do Neo4j</h2><p class="dica">Cada chamada, com o que o banco respondeu.</p></div>
+    <button class="botao fantasma sm" type="button" id="fechar-bastidores">Fechar</button></div>
+  <ol class="eventos" id="log"><li class="vazio">As operações aparecem aqui.</li></ol>
+</aside>
+<script src="/static/grafo.js?v=3"></script>
+</body>
+</html>
