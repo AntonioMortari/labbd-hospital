@@ -1,0 +1,61 @@
+body { overflow-y: auto; }
+.tela { max-width: 1240px; margin: 0 auto; padding: 28px 32px 48px; }
+.cabecalho { align-items: flex-start; }
+.relogio-caixa { display: grid; justify-items: end; gap: 2px; white-space: nowrap; }
+#clock { font-size: 1.5rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+.abas { margin-bottom: 16px; }
+.abas .contador { margin-left: 4px; }
+.subtitulo { display: flex; align-items: baseline; gap: 10px; margin: 24px 0 10px; font-size: 1.0625rem; font-weight: 700; }
+.subtitulo .dica { font-weight: 400; }
+.faixa-alertas { background: var(--recusado-claro); color: var(--recusado-texto); border: 1px solid #F8C2BC; border-radius: var(--raio); padding: 12px 16px; margin-bottom: 14px; display: grid; gap: 6px; }
+.faixa-alertas .item-alerta { display: flex; gap: 10px; flex-wrap: wrap; align-items: baseline; font-size: .9375rem; }
+.faixa-alertas .quem { font-weight: 700; }
+.aviso-offline { background: var(--alerta-claro); color: var(--alerta-texto); padding: 10px 14px; border-radius: var(--raio-c); margin-bottom: 14px; font-weight: 600; }
+.monitor { display: grid; grid-template-columns: 250px minmax(0, 1fr); gap: 16px; align-items: start; }
+.lista-pacientes { overflow: hidden; }
+#patient-list { max-height: 440px; overflow-y: auto; }
+.item-alerta.clicavel { cursor: pointer; }
+.item-alerta.clicavel:hover .quem { text-decoration: underline; }
+.lista-topo { padding: 12px 16px; font-size: .8125rem; font-weight: 700; color: var(--texto-3); text-transform: uppercase; letter-spacing: .05em; border-bottom: 1px solid var(--borda); }
+.paciente-botao { display: flex; align-items: center; gap: 10px; width: 100%; padding: 12px 16px; border: 0; border-bottom: 1px solid var(--linha); background: #fff; font: inherit; text-align: left; cursor: pointer; transition: background-color .15s ease; }
+.paciente-botao:hover { background: var(--fundo); }
+.paciente-botao.sel { background: var(--destaque-claro); }
+.paciente-botao .nome { display: grid; min-width: 0; }
+.paciente-botao .nome b { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.paciente-botao .nome small { color: var(--texto-3); font-size: .8125rem; }
+.ponto { width: 10px; height: 10px; border-radius: 50%; flex: none; background: var(--gravado); }
+.ponto.warning { background: #D97706; }
+.ponto.critical { background: var(--recusado); }
+.painel-paciente { display: grid; gap: 16px; min-width: 0; }
+.ficha { padding: 18px 20px; display: grid; gap: 16px; }
+.ficha-topo { display: flex; align-items: center; gap: 14px; }
+.ficha-topo h2 { font-size: 1.25rem; font-weight: 700; line-height: 1.2; }
+.ficha-topo .selo { margin-left: auto; }
+.pulso { width: 16px; height: 16px; border-radius: 50%; background: var(--gravado); flex: none; animation: pulsa 1.4s ease-in-out infinite; }
+.pulso.warning { background: #D97706; }
+.pulso.critical { background: var(--recusado); }
+@keyframes pulsa { 50% { box-shadow: 0 0 0 7px rgba(21, 128, 61, .15); } }
+.sinais { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+.sinal { border: 1px solid var(--borda); border-radius: var(--raio-c); padding: 12px 14px; display: grid; gap: 2px; }
+.sinal span { font-size: .8125rem; color: var(--texto-3); font-weight: 600; }
+.sinal b { font-size: 1.75rem; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.sinal small { font-size: .875rem; color: var(--texto-3); font-weight: 500; }
+.sinal.ruim { border-color: #F2A39B; background: var(--recusado-claro); color: var(--recusado-texto); }
+.graficos { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.graficos iframe { width: 100%; height: 300px; border: 1px solid var(--borda); border-radius: var(--raio); background: #fff; }
+.bloco { padding: 18px 20px; display: grid; gap: 12px; margin-bottom: 16px; }
+.bloco h2 { font-size: 1.0625rem; font-weight: 700; }
+.porque { color: var(--texto-2); max-width: 80ch; }
+.fichas { display: flex; flex-wrap: wrap; gap: 6px; }
+.mono { font-family: var(--mono); font-size: .8125rem; }
+@media (max-width: 960px) { .monitor { grid-template-columns: minmax(0, 1fr); } .graficos { grid-template-columns: minmax(0, 1fr); } .painel-paciente, .ficha, .graficos > * { min-width: 0; } .tela { padding: 20px 16px 32px; } .abas { width: 100%; } }
+
+@media (max-width: 720px) {
+  .faixa-alertas .item-alerta span + span { display: none; }
+  .faixa-alertas .item-alerta { display: block; }
+  .relogio-caixa { justify-items: start; }
+}
+
+.barra-graficos { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.barra-graficos .campo-inline .controle { width: 210px; }
+@media (max-width: 720px) { .barra-graficos .campo-inline { width: 100%; } .barra-graficos .campo-inline .controle { width: auto; flex: 1; } }

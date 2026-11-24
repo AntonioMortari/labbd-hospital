@@ -1,0 +1,87 @@
+{
+  "id": null,
+  "uid": "vitals-main",
+  "title": "Monitoramento de sinais vitais",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "5s",
+  "editable": false,
+  "time": {"from": "now-15m", "to": "now"},
+  "templating": {
+    "list": [{
+      "name": "patient_id",
+      "label": "Paciente",
+      "type": "query",
+      "datasource": {"type": "postgres", "uid": "timescale-vitals"},
+      "query": "SELECT patient_id AS \"__value\", patient_name AS \"__text\" FROM patients ORDER BY bed",
+      "includeAll": false,
+      "current": {"text": "patient_001", "value": "patient_001"}
+    }]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "timeseries",
+      "title": "Frequência cardíaca",
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
+      "datasource": {"type": "postgres", "uid": "timescale-vitals"},
+      "fieldConfig": {"defaults": {"unit": "bpm"}, "overrides": []},
+      "options": {"legend": {"displayMode": "list", "placement": "bottom"}, "tooltip": {"mode": "single"}},
+      "targets": [{
+        "refId": "A",
+        "format": "time_series",
+        "rawQuery": true,
+        "datasource": {"type": "postgres", "uid": "timescale-vitals"},
+        "rawSql": "SELECT observed_at AS \"time\", hr AS \"Frequência cardíaca (bpm)\" FROM vital_signs WHERE $__timeFilter(observed_at) AND patient_id = ${patient_id:sqlstring} ORDER BY observed_at"
+      }]
+    },
+    {
+      "id": 2,
+      "type": "timeseries",
+      "title": "Pressão arterial",
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0},
+      "datasource": {"type": "postgres", "uid": "timescale-vitals"},
+      "fieldConfig": {"defaults": {"unit": "mmHg"}, "overrides": []},
+      "options": {"legend": {"displayMode": "list", "placement": "bottom"}, "tooltip": {"mode": "multi"}},
+      "targets": [{
+        "refId": "A",
+        "format": "time_series",
+        "rawQuery": true,
+        "datasource": {"type": "postgres", "uid": "timescale-vitals"},
+        "rawSql": "SELECT observed_at AS \"time\", bp_sys AS \"Pressão sistólica (mmHg)\", bp_dia AS \"Pressão diastólica (mmHg)\" FROM vital_signs WHERE $__timeFilter(observed_at) AND patient_id = ${patient_id:sqlstring} ORDER BY observed_at"
+      }]
+    },
+    {
+      "id": 6,
+      "type": "timeseries",
+      "title": "Saturação de oxigênio (SpO₂)",
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8},
+      "datasource": {"type": "postgres", "uid": "timescale-vitals"},
+      "fieldConfig": {"defaults": {"unit": "percent"}, "overrides": []},
+      "options": {"legend": {"displayMode": "list", "placement": "bottom"}, "tooltip": {"mode": "single"}},
+      "targets": [{
+        "refId": "A",
+        "format": "time_series",
+        "rawQuery": true,
+        "datasource": {"type": "postgres", "uid": "timescale-vitals"},
+        "rawSql": "SELECT observed_at AS \"time\", spo2 AS \"Saturação de oxigênio (%)\" FROM vital_signs WHERE $__timeFilter(observed_at) AND patient_id = ${patient_id:sqlstring} ORDER BY observed_at"
+      }]
+    },
+    {
+      "id": 7,
+      "type": "timeseries",
+      "title": "Tendência SpO₂ — média móvel de 5 minutos",
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8},
+      "datasource": {"type": "postgres", "uid": "timescale-vitals"},
+      "fieldConfig": {"defaults": {"unit": "percent"}, "overrides": []},
+      "options": {"legend": {"displayMode": "list", "placement": "bottom"}, "tooltip": {"mode": "single"}},
+      "targets": [{
+        "refId": "A",
+        "format": "time_series",
+        "rawQuery": true,
+        "datasource": {"type": "postgres", "uid": "timescale-vitals"},
+        "rawSql": "WITH trend AS (SELECT bucket, AVG(spo2_avg) OVER (ORDER BY bucket ROWS BETWEEN 4 PRECEDING AND CURRENT ROW) AS spo2_avg_5m FROM vital_signs_1m WHERE $__timeFilter(bucket) AND patient_id = ${patient_id:sqlstring}) SELECT bucket AS \"time\", spo2_avg_5m AS \"SpO₂ — média móvel de 5 min (%)\" FROM trend ORDER BY bucket"
+      }]
+    }
+  ]
+}
