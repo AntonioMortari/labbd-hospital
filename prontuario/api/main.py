@@ -4,6 +4,7 @@ Modelo entregue pelo Gustavo: um documento por paciente em `prontuarios` (com ev
 prescrições embutidos) e, em `historico_versoes`, a cópia de cada versão anterior com a auditoria da alteração.
 """
 import copy
+import json
 import mimetypes
 import os
 import time
@@ -11,14 +12,48 @@ from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 
 from bson import ObjectId
+import dblog
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field, field_validator
-from pymongo import ASCENDING, DESCENDING, MongoClient
+from pymongo import ASCENDING, DESCENDING, MongoClient, monitoring
 from pymongo.errors import DuplicateKeyError
 
 mimetypes.add_type("font/woff2", ".woff2")
+class EscutaComandos(monitoring.CommandListener):
+    """O pymongo avisa cada comando enviado ao MongoDB (insert, update, find...), com o tempo de cada um."""
+    IGNORAR = {"hello", "isMaster", "ismaster", "ping", "saslStart", "saslContinue", "endSessions", "buildInfo", "listCollections"}
+    SUJEIRA = {"lsid", "$db", "$clusterTime", "txnNumber", "$readPreference"}
+
+    def __init__(self):
+        self.pendentes = {}
+
+    def started(self, e):
+        if dblog.consultas.get() is not None and e.command_name not in self.IGNORAR:
+            self.pendentes[e.request_id] = (e.command, e.database_name)
+
+    def _fim(self, e, falha=None, resposta=None):
+        p = self.pendentes.pop(e.request_id, None)
+        if p is None:
+            return
+        cmd = {k: v for k, v in p[0].items() if k not in self.SUJEIRA}
+        colecao = next(iter(cmd.values()), "")
+        linhas = None
+        if resposta:
+            linhas = resposta.get("n") if "n" in resposta else len(resposta.get("cursor", {}).get("firstBatch", [])) if "cursor" in resposta else None
+        dblog.registrar("mongo", json.dumps(cmd, ensure_ascii=False, indent=2, default=str), ms=e.duration_micros / 1000, linhas=linhas,
+                        erro=falha.get("errmsg") if isinstance(falha, dict) else None,
+                        nota=f"{e.command_name} em {p[1]}.{colecao}")
+
+    def succeeded(self, e):
+        self._fim(e, resposta=e.reply)
+
+    def failed(self, e):
+        self._fim(e, falha=e.failure)
+
+
+monitoring.register(EscutaComandos())
 client = MongoClient(os.getenv("MONGO_URI", "mongodb://localhost:27017"), tz_aware=True, serverSelectionTimeoutMS=5000)
 db = client[os.getenv("MONGO_DB", "prontuario_medico")]
 prontuarios, historico = db["prontuarios"], db["historico_versoes"]
@@ -37,6 +72,27 @@ async def lifespan(app):
 
 app = FastAPI(title="Tema 4 — Prontuário Eletrônico (MongoDB)", lifespan=lifespan)
 app.mount("/static", StaticFiles(directory="static"), name="static")
+
+@app.middleware("http")
+async def log_do_banco(request, call_next):
+    """Se o navegador pediu (X-Log: 1), devolve o que o banco executou nesta requisição."""
+    if request.headers.get("x-log") != "1":
+        return await call_next(request)
+    dblog.iniciar()
+    resposta = await call_next(request)
+    h = dblog.cabecalho()
+    if h:
+        resposta.headers["X-DB-Log"] = h
+    return resposta
+
+
+@app.middleware("http")
+async def sem_cache_estatico(request, call_next):
+    """Telas mudaram? O navegador revalida em vez de usar cópia velha."""
+    resposta = await call_next(request)
+    if request.url.path == "/" or request.url.path.startswith("/static/"):
+        resposta.headers["Cache-Control"] = "no-cache"
+    return resposta
 
 
 def agora():

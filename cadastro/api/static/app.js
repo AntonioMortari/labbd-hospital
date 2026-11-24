@@ -47,13 +47,19 @@ const estado = {
 
 async function api(metodo, caminho, corpo) {
   const opcoes = { method: metodo, headers: { "X-Usuario": $("#usuario").value } };
+  if (metodo !== "GET") opcoes.headers["X-Log"] = "1";  // pede à API o SQL que o banco executou
   if (corpo !== undefined) {
     opcoes.headers["Content-Type"] = "application/json";
     opcoes.body = JSON.stringify(corpo);
   }
   try {
+    const t0 = performance.now();
     const r = await fetch(caminho, opcoes);
     const dados = await r.json().catch(() => ({}));
+    if (metodo !== "GET") {
+      const consultas = await Detalhes.decodificar(r.headers.get("X-DB-Log"));
+      estado.ultimoLog = { op: `${metodo} ${caminho}`, status: r.status, ms: performance.now() - t0, consultas: consultas || [], resposta: dados };
+    }
     return { ok: r.ok, status: r.status, dados };
   } catch {
     return { ok: false, status: 0, dados: { detail: "Sem conexão com a API (localhost:8081)." } };
@@ -205,7 +211,8 @@ function mudancas(a) {
 // ---------------------------------------------------------------- bastidores do banco
 const bastidores = {
   registrar(ev) {
-    estado.eventos.unshift({ ...ev, em: new Date() });
+    estado.eventos.unshift({ ...ev, regraHtml: true, ...(estado.ultimoLog || {}), em: new Date() });
+    estado.ultimoLog = null;
     estado.eventos.length = Math.min(estado.eventos.length, 30);
     this.desenhar();
   },
@@ -213,7 +220,7 @@ const bastidores = {
     $("#eventos-vazio").hidden = estado.eventos.length > 0;
     $("#conta-eventos").textContent = estado.eventos.length || "";
     $("#eventos").innerHTML = estado.eventos.map((e) => `
-      <li class="evento ${e.ok ? "ok" : "erro"}">
+      <li class="evento ${e.ok ? "ok" : "erro"} ${e.consultas?.length ? "clicavel" : ""}" ${e.consultas?.length ? `data-evento="${estado.eventos.indexOf(e)}" tabindex="0" role="button" aria-label="Ver o SQL executado"` : ""}>
         <div class="evento-topo">
           <span class="selo ${e.ok ? "gravado" : "recusado"}">${e.ok ? "Gravado" : "Recusado"}</span>
           <span class="evento-codigo">${e.status || "—"}</span>
@@ -222,6 +229,7 @@ const bastidores = {
         <p class="evento-titulo">${esc(e.titulo)}</p>
         ${e.regra ? `<p class="evento-regra">${e.regra}</p>` : ""}
         ${e.sqlstate ? `<p class="evento-sqlstate">SQLSTATE ${esc(e.sqlstate)}</p>` : ""}
+        ${Detalhes.rodape(e)}
       </li>`).join("");
   },
   abrir() { $("#bastidores").classList.add("aberto"); },
@@ -290,11 +298,15 @@ document.addEventListener("click", (e) => {
   const abrir = e.target.closest("[data-abrir]");
   if (abrir) gaveta.abrir(abrir.dataset.abrir);
   if (e.target.closest("[data-fechar]") || e.target.id === "fundo-gaveta") gaveta.fechar();
+  const cartao = e.target.closest("[data-evento]");
+  if (cartao) Detalhes.abrir(estado.eventos[Number(cartao.dataset.evento)]);
   if (e.target.closest("#abrir-bastidores")) bastidores.abrir();
   if (e.target.closest(".fechar-bastidores")) bastidores.fechar();
 });
 document.addEventListener("keydown", (e) => {
-  if (e.key === "Escape") { gaveta.fechar(); bastidores.fechar(); }
+  const cartao = e.target.closest?.("[data-evento]");
+  if (cartao && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); Detalhes.abrir(estado.eventos[Number(cartao.dataset.evento)]); return; }
+  if (e.key === "Escape" && !document.getElementById("dlg-detalhe")?.open) { gaveta.fechar(); bastidores.fechar(); }
 });
 
 $$("#form-agendamento [name=tipo]").forEach((r) => r.addEventListener("change", () => {

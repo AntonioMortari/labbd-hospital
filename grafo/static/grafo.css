@@ -3,8 +3,7 @@ body { overflow-y: auto; }
 .cabecalho { align-items: flex-start; }
 .acoes-topo { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
 .acoes-topo .botao { text-decoration: none; }
-.abas { width: 520px; margin-bottom: 16px; }
-.segmentado.abas { grid-template-columns: repeat(4, 1fr); }
+.abas { margin-bottom: 16px; }
 .barra { display: flex; align-items: center; gap: 16px; margin-bottom: 14px; min-height: 42px; flex-wrap: wrap; }
 .campo-inline .controle { width: 260px; }
 .subtitulo { display: flex; align-items: baseline; gap: 10px; margin: 24px 0 10px; font-size: 1.0625rem; font-weight: 700; }

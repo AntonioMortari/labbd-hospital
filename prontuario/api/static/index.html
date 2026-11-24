@@ -5,8 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Prontuário eletrônico</title>
 <link rel="preload" href="/static/fonts/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="/static/kit.css">
-<link rel="stylesheet" href="/static/prontuario.css?v=1">
+<link rel="stylesheet" href="/static/kit.css?v=3">
+<link rel="stylesheet" href="/static/prontuario.css?v=2">
 <script src="/static/embed.js"></script>
 </head>
 <body>
@@ -14,7 +14,7 @@
   <header class="cabecalho">
     <div><h1>Prontuário eletrônico</h1><p>Um documento por paciente, com evoluções, exames e prescrições. Toda alteração guarda a versão anterior (MongoDB).</p></div>
     <div class="acoes-topo">
-      <button class="botao fantasma" id="abrir-bastidores" type="button">Bastidores do MongoDB <span class="contador" id="conta-eventos"></span></button>
+      <button class="botao secundario" id="abrir-bastidores" type="button">Bastidores do MongoDB <span class="contador" id="conta-eventos"></span></button>
       <button class="botao secundario" id="exemplos" type="button">Carregar exemplos</button>
       <button class="botao primario" id="novo" type="button">+ Novo prontuário</button>
     </div>
@@ -66,6 +66,7 @@
     <button class="botao fantasma sm" type="button" id="fechar-bastidores">Fechar</button></div>
   <ol class="eventos" id="log"><li class="vazio">As operações aparecem aqui.</li></ol>
 </aside>
-<script src="/static/prontuario.js?v=1"></script>
+<script src="/static/detalhes.js?v=3"></script>
+<script src="/static/prontuario.js?v=3"></script>
 </body>
 </html>

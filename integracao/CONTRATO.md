@@ -39,6 +39,16 @@ parecerem do mesmo sistema, use o kit em [`kit/`](kit/):
 
 O Tema 1 (`cadastro/`) e a tela de operação do Tema 3 (`emergencia/api/static/operacao.html`) são exemplos prontos.
 
+## Bastidores: o que o banco executou (opcional)
+
+Quem tem um painel "Bastidores" pode mostrar, num modal ao clicar na ação, os comandos que o banco recebeu (SQL, Cypher, MongoDB ou Redis):
+
+1. O navegador manda `X-Log: 1` na requisição.
+2. A API registra os comandos daquela requisição e devolve no cabeçalho `X-DB-Log` (JSON comprimido com zlib e em base64). Exemplos prontos:
+   `dblog.py` + `db.py` no Tema 1 (asyncpg), `grafo/main.py` (Neo4j), `prontuario/api/main.py` (MongoDB) e `emergencia/api/main.py` (Redis).
+3. A interface usa `detalhes.js` do kit: `Detalhes.decodificar(resposta.headers.get("X-DB-Log"))` e `Detalhes.abrir(evento)`.
+4. Se houver nginx na frente da API, aumente `proxy_buffer_size` (o cabeçalho pode passar de 4 KB).
+
 ## Identidade do paciente: quem é o dono
 
 O **Tema 1 é o dono do cadastro de pacientes e médicos**. Os outros temas guardam **só o `paciente_id`** (número

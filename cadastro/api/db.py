@@ -4,12 +4,25 @@ from contextlib import asynccontextmanager
 from typing import AsyncIterator
 
 import asyncpg
+
+import dblog
 from fastapi import HTTPException
 
 pool: asyncpg.Pool | None = None
 
 
+def _log(rec) -> None:
+    """Chamado pelo asyncpg a cada comando enviado ao PostgreSQL (BEGIN, SELECT, INSERT, CALL, COMMIT...)."""
+    if rec.query.startswith("SELECT pg_advisory_unlock_all"):
+        return  # limpeza da conexão devolvida ao pool, não faz parte da ação
+    erro = None
+    if rec.exception is not None:
+        erro = f"{getattr(rec.exception, 'message', rec.exception)} (SQLSTATE {getattr(rec.exception, 'sqlstate', '?')})"
+    dblog.registrar("sql", rec.query, params=list(rec.args) if rec.args else None, ms=rec.elapsed * 1000, erro=erro)
+
+
 async def _codecs(conn: asyncpg.Connection) -> None:
+    conn.add_query_logger(_log)
     for tipo in ("json", "jsonb"):
         await conn.set_type_codec(tipo, encoder=json.dumps, decoder=json.loads, schema="pg_catalog")
 

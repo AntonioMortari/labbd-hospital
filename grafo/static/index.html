@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Interações e rede de contato</title>
 <link rel="preload" href="/static/fonts/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="/static/kit.css">
+<link rel="stylesheet" href="/static/kit.css?v=3">
 <link rel="stylesheet" href="/static/grafo.css?v=3">
 <script src="/static/embed.js"></script>
 </head>
@@ -14,7 +14,7 @@
   <header class="cabecalho">
     <div><h1>Interações e rede de contato</h1><p>Pacientes, medicamentos, patologias e profissionais ligados num grafo (Neo4j). Os riscos saem de percorrer as ligações.</p></div>
     <div class="acoes-topo">
-      <button class="botao fantasma" id="abrir-bastidores" type="button">Bastidores do Neo4j <span class="contador" id="conta-eventos"></span></button>
+      <button class="botao secundario" id="abrir-bastidores" type="button">Bastidores do Neo4j <span class="contador" id="conta-eventos"></span></button>
       <a class="botao secundario" href="http://localhost:7474" target="_blank" rel="noopener">Neo4j Browser</a>
     </div>
   </header>
@@ -113,6 +113,7 @@
     <button class="botao fantasma sm" type="button" id="fechar-bastidores">Fechar</button></div>
   <ol class="eventos" id="log"><li class="vazio">As operações aparecem aqui.</li></ol>
 </aside>
-<script src="/static/grafo.js?v=3"></script>
+<script src="/static/detalhes.js?v=3"></script>
+<script src="/static/grafo.js?v=4"></script>
 </body>
 </html>

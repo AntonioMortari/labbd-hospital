@@ -16,22 +16,33 @@ const COR_REL = Object.fromEntries(Object.values(REL).map((r) => [r[3], r[4]]));
 let nos = [], arestas = [], selNo = null, eventos = 0, confirmaLimpar = null;
 
 // ---- chamadas à API, registradas nos bastidores
+// ---- detalhes de cada ação: clicar (ou Enter) num cartão abre o que o banco executou
+const detalhesPorId = new Map(); let seqDetalhe = 0;
+function ligarDetalhes() {
+  const abrir = (el) => { const ev = detalhesPorId.get(el?.dataset.ev); if (ev) Detalhes.abrir(ev); };
+  $("log").addEventListener("click", (e) => abrir(e.target.closest("[data-ev]")));
+  $("log").addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { const c = e.target.closest("[data-ev]"); if (c) { e.preventDefault(); abrir(c); } } });
+}
+
 async function api(op, metodo, url, corpo) {
   const t0 = performance.now();
-  let status = 0, dados = null;
+  let status = 0, dados = null, consultas = [];
   try {
-    const r = await fetch(url, { method: metodo, ...(corpo ? { headers: { "Content-Type": "application/json" }, body: JSON.stringify(corpo) } : {}) });
+    const r = await fetch(url, { method: metodo, headers: { "X-Log": "1", ...(corpo ? { "Content-Type": "application/json" } : {}) }, ...(corpo ? { body: JSON.stringify(corpo) } : {}) });
     status = r.status; dados = await r.json().catch(() => ({}));
+    consultas = await Detalhes.decodificar(r.headers.get("X-DB-Log")) || [];
   } catch { dados = { detail: "API fora do ar" }; }
   const ok = status >= 200 && status < 300;
-  registrar(op, ok, status, ok ? "" : (typeof dados.detail === "string" ? dados.detail : "Pedido recusado"), performance.now() - t0);
+  registrar(op, ok, status, ok ? "" : (typeof dados.detail === "string" ? dados.detail : "Pedido recusado"), performance.now() - t0, { consultas, resposta: dados });
   return { ok, dados };
 }
-function registrar(op, ok, status, detalhe, ms) {
+function registrar(op, ok, status, detalhe, ms, extra = {}) {
+  const ev = { titulo: op, op, ok, status, ms, ...extra }, id = String(++seqDetalhe); detalhesPorId.set(id, ev);
   const li = document.createElement("li");
-  li.className = `evento ${ok ? "ok" : "erro"}`;
+  li.className = `evento ${ok ? "ok" : "erro"} ${ev.consultas?.length ? "clicavel" : ""}`;
+  if (ev.consultas?.length) { li.dataset.ev = id; li.tabIndex = 0; li.setAttribute("role", "button"); }
   li.innerHTML = `<div class="evento-topo"><span class="selo ${ok ? "gravado" : "recusado"}">${ok ? "executado" : "recusado"}</span><b>${status || "—"}</b><time>${new Date().toLocaleTimeString("pt-BR")}</time></div>
-    <div><b>${esc(op)}</b> · ${Math.round(ms)} ms${detalhe ? ` · ${esc(detalhe)}` : ""}</div>`;
+    <div><b>${esc(op)}</b> · ${Math.round(ms)} ms${detalhe ? ` · ${esc(detalhe)}` : ""}</div>${Detalhes.rodape(ev)}`;
   $("log").querySelector(".vazio")?.remove();
   $("log").prepend(li);
   while ($("log").children.length > 20) $("log").lastChild.remove();
@@ -214,3 +225,4 @@ $("cy-interacao").textContent = `MATCH (p:Paciente {id: $id})
 WHERE a.id < b.id
 RETURN a.nome, b.nome`;
 carregar();
+ligarDetalhes();

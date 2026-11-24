@@ -34,25 +34,36 @@ function regraDe(op) {
   if (metodo !== "GET" && /^\/prontuarios\/\{n\}\//.test(g)) return ALTERA;
   return REGRAS[`${metodo} ${g}`] || "";
 }
+// ---- detalhes de cada ação: clicar (ou Enter) num cartão abre o que o banco executou
+const detalhesPorId = new Map(); let seqDetalhe = 0;
+function ligarDetalhes() {
+  const abrir = (el) => { const ev = detalhesPorId.get(el?.dataset.ev); if (ev) Detalhes.abrir(ev); };
+  $("log").addEventListener("click", (e) => abrir(e.target.closest("[data-ev]")));
+  $("log").addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { const c = e.target.closest("[data-ev]"); if (c) { e.preventDefault(); abrir(c); } } });
+}
+
 async function api(metodo, url, corpo) {
   const op = `${metodo} ${url}`, t0 = performance.now();
-  let status = 0, dados = {};
+  let status = 0, dados = {}, consultas = [];
   try {
-    const r = await fetch(url, { method: metodo, ...(corpo ? { headers: { "Content-Type": "application/json" }, body: JSON.stringify(corpo) } : {}) });
+    const r = await fetch(url, { method: metodo, headers: { "X-Log": "1", ...(corpo ? { "Content-Type": "application/json" } : {}) }, ...(corpo ? { body: JSON.stringify(corpo) } : {}) });
     status = r.status; dados = await r.json().catch(() => ({}));
+    consultas = await Detalhes.decodificar(r.headers.get("X-DB-Log")) || [];
   } catch { dados = { detail: "API fora do ar" }; }
   const ok = status >= 200 && status < 300;
   let detalhe = "";
   if (!ok) detalhe = typeof dados.detail === "string" ? dados.detail : Array.isArray(dados.detail) ? dados.detail.map((e) => `${(e.loc || []).slice(1).join(".")}: ${e.msg}`).join("; ") : "Pedido recusado";
-  registrar(op, ok, status, detalhe, performance.now() - t0);
+  registrar(op, ok, status, detalhe, performance.now() - t0, { consultas, resposta: dados });
   return { ok, status, dados, detalhe };
 }
-function registrar(op, ok, status, detalhe, ms) {
-  const li = document.createElement("li");
-  li.className = `evento ${ok ? "ok" : "erro"}`;
+function registrar(op, ok, status, detalhe, ms, extra = {}) {
   const regra = regraDe(op);
+  const ev = { titulo: op, op, ok, status, ms, regra: detalhe || regra, ...extra }, id = String(++seqDetalhe); detalhesPorId.set(id, ev);
+  const li = document.createElement("li");
+  li.className = `evento ${ok ? "ok" : "erro"} ${ev.consultas?.length ? "clicavel" : ""}`;
+  if (ev.consultas?.length) { li.dataset.ev = id; li.tabIndex = 0; li.setAttribute("role", "button"); }
   li.innerHTML = `<div class="evento-topo"><span class="selo ${ok ? "gravado" : "recusado"}">${ok ? "executado" : "recusado"}</span><b>${status || "—"}</b><time>${new Date().toLocaleTimeString("pt-BR")}</time></div>
-    <div><b>${esc(op)}</b> · ${Math.round(ms)} ms${detalhe ? ` · ${esc(detalhe)}` : ""}</div>${regra && ok ? `<div class="evento-regra">${esc(regra)}</div>` : ""}`;
+    <div><b>${esc(op)}</b> · ${Math.round(ms)} ms${detalhe ? ` · ${esc(detalhe)}` : ""}</div>${regra && ok ? `<div class="evento-regra">${esc(regra)}</div>` : ""}${Detalhes.rodape(ev)}`;
   $("log").querySelector(".vazio")?.remove(); $("log").prepend(li);
   while ($("log").children.length > 20) $("log").lastChild.remove();
   $("conta-eventos").textContent = ++eventos;
@@ -99,7 +110,7 @@ function desenhar() {
         <div><span class="rotulo">Doenças crônicas</span>${fichas(h.doencas_cronicas || [], "aviso")}</div>
         <div><span class="rotulo">Antecedentes</span><p>${esc(h.antecedentes) || '<span class="dica">Nenhum registro</span>'}</p></div></div></section>
     <section class="cartao bloco"><header><h2>Evoluções</h2><button class="botao primario sm" data-acao="evolucao">+ Nova evolução</button></header>
-      ${ev.length ? ev.map(({ e, i }) => `<div class="item"><div class="item-topo"><b>${esc(quando(e.data))}</b><span class="meta">${esc(nomeMedico(e.medico_id))}</span><button class="botao fantasma sm" data-acao="corrigir" data-i="${i}">Corrigir</button></div><p>${esc(e.descricao)}</p></div>`).join("") : '<p class="vazio">Nenhuma evolução registrada.</p>'}</section>
+      ${ev.length ? ev.map(({ e, i }) => `<div class="item"><div class="item-topo"><b>${esc(quando(e.data))}</b><span class="meta">${esc(nomeMedico(e.medico_id))}</span><button class="botao secundario sm" data-acao="corrigir" data-i="${i}">Corrigir</button></div><p>${esc(e.descricao)}</p></div>`).join("") : '<p class="vazio">Nenhuma evolução registrada.</p>'}</section>
     <section class="cartao bloco"><header><h2>Exames</h2><button class="botao primario sm" data-acao="exame">+ Novo exame</button></header>
       ${d.exames.length ? [...d.exames].reverse().map((x) => `<div class="item"><div class="item-topo"><b>${esc(x.tipo)}</b><span class="meta">${esc(quando(x.data))}${x.laboratorio ? " · " + esc(x.laboratorio) : ""}</span></div>${kv(x.resultado || {})}${x.laudo ? `<p>${esc(x.laudo)}</p>` : ""}</div>`).join("") : '<p class="vazio">Nenhum exame registrado.</p>'}</section>
     <section class="cartao bloco"><header><h2>Prescrições</h2><button class="botao primario sm" data-acao="prescricao">+ Nova prescrição</button></header>
@@ -178,7 +189,7 @@ async function carregarVersoes(id) {
   const d = r.dados, itens = [...d.alteracoes].reverse();
   $("versoes").innerHTML = `<div class="cartao bloco"><header><h2>Histórico de alterações</h2><span class="selo destaque sem-ponto">versão atual: v${d.versao_atual}</span></header>
     ${itens.map((a) => `<div class="versao"><div class="versao-topo"><span class="selo aviso sem-ponto">v${a.de_versao} → v${a.para_versao}</span><b>${esc(quando(a.auditoria.data_alteracao))}</b><span class="meta">${esc(nomeMedico(a.auditoria.responsavel_id))}</span>
-        <button class="botao fantasma sm" data-versao="${a.de_versao}">Ver a v${a.de_versao}</button></div><div class="just">${esc(a.auditoria.justificativa)}</div>
+        <button class="botao secundario sm" data-versao="${a.de_versao}">Ver a v${a.de_versao}</button></div><div class="just">${esc(a.auditoria.justificativa)}</div>
         ${a.mudancas.length ? `<div class="mudanca">${a.mudancas.map((m) => `<span class="caminho">${esc(rotulo(m.caminho))}</span><span>${m.antes == null ? `<span class="depois">adicionado: ${esc(resumo(m.depois))}</span>` : m.depois == null ? `<span class="antes">${esc(resumo(m.antes))}</span> removido` : `<span class="antes">${esc(resumo(m.antes))}</span> → <span class="depois">${esc(resumo(m.depois))}</span>`}</span>`).join("")}</div>` : ""}</div>`).join("")}
     <div class="versao"><div class="versao-topo"><span class="selo gravado sem-ponto">v1</span><b>${esc(quando(d.criado_em))}</b><span class="meta">Prontuário criado</span></div></div></div>`;
 }
@@ -197,7 +208,7 @@ async function carregarMongo() {
   const r = await api("GET", "/colecoes");
   if (!r.ok) return;
   const d = r.dados;
-  $("mongo").innerHTML = `<dl class="cartao resumo" style="margin-bottom:16px;grid-template-columns:repeat(3,1fr)"><div><dt>Banco</dt><dd>${esc(d.banco)}</dd></div><div><dt>MongoDB</dt><dd>${esc(d.versao_mongo)}</dd></div><div><dt>Coleções</dt><dd>${d.colecoes.length}</dd></div></dl>` +
+  $("mongo").innerHTML = `<dl class="cartao resumo tres" style="margin-bottom:16px"><div><dt>Banco</dt><dd>${esc(d.banco)}</dd></div><div><dt>MongoDB</dt><dd>${esc(d.versao_mongo)}</dd></div><div><dt>Coleções</dt><dd>${d.colecoes.length}</dd></div></dl>` +
     d.colecoes.map((c) => `<article class="cartao bloco colecao"><header><h2>${esc(c.nome)}</h2><span class="selo destaque sem-ponto">${c.documentos} ${c.documentos === 1 ? "documento" : "documentos"}</span></header>
       <div class="corpo">${PORQUE[c.nome] ? `<p>${esc(PORQUE[c.nome])}</p>` : ""}
         <div class="fichas">${c.indices.map((i) => `<span class="selo ${i.unico ? "gravado" : ""} sem-ponto">índice ${esc(i.nome)}${i.unico ? " · único" : ""}</span>`).join("")}</div>
@@ -213,3 +224,4 @@ $("sel-paciente").addEventListener("change", mostrar);
 $("abrir-bastidores").addEventListener("click", () => { $("bastidores").hidden = !$("bastidores").hidden; });
 $("fechar-bastidores").addEventListener("click", () => { $("bastidores").hidden = true; $("abrir-bastidores").focus(); });
 carregarCadastro().then(() => carregarLista());
+ligarDetalhes();

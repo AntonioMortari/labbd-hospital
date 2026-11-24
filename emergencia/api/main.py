@@ -1,5 +1,6 @@
 import os, time, uuid, json, asyncio
 from contextlib import asynccontextmanager
+import dblog
 from fastapi import FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
@@ -55,6 +56,18 @@ async def sem_cache_estatico(request: Request, call_next):
 app.include_router(inspecao.criar(r, CHANNEL))
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
+@app.middleware("http")
+async def log_do_banco(request, call_next):
+    """Se o navegador pediu (X-Log: 1), devolve o que o banco executou nesta requisição."""
+    if request.headers.get("x-log") != "1":
+        return await call_next(request)
+    dblog.iniciar()
+    resposta = await call_next(request)
+    h = dblog.cabecalho()
+    if h:
+        resposta.headers["X-DB-Log"] = h
+    return resposta
+
 
 class PatientIn(BaseModel):
     name: str
@@ -74,12 +87,21 @@ async def register(p: PatientIn):
         pipe.hset(f"patient:{pid}", mapping=campos)
         pipe.zadd(QUEUE, {pid: score})
         await pipe.execute()
+    dblog.registrar("redis", "MULTI", nota="transação: os dois comandos entram juntos ou nenhum")
+    dblog.registrar("redis", "HSET patient:" + pid + " " + " ".join(f"{k} {v}" for k, v in campos.items()), nota="ficha do paciente (hash)")
+    dblog.registrar("redis", f"ZADD {QUEUE} {score} {pid}", nota=f"fila por prioridade: pontuação = {p.priority} × 10¹³ + horário de chegada")
+    dblog.registrar("redis", "EXEC")
     return {"id": pid}
 
 
 @app.post("/triage/call-next")
 async def call(room: str):
-    res = await call_next(keys=[QUEUE, RECENT, CHANNEL], args=[room, int(time.time() * 1000)])
+    t0 = time.perf_counter()
+    agora = int(time.time() * 1000)
+    res = await call_next(keys=[QUEUE, RECENT, CHANNEL], args=[room, agora])
+    dblog.registrar("redis", f"EVALSHA CALL_NEXT 3 {QUEUE} {RECENT} {CHANNEL} {room} {agora}", ms=(time.perf_counter() - t0) * 1000,
+                    nota="o script roda inteiro no servidor, sem que outro comando entre no meio")
+    dblog.registrar("lua", CALL_NEXT.strip(), nota="código do script CALL_NEXT")
     if res is None:
         raise HTTPException(404, "Fila vazia")
     return json.loads(res)
@@ -110,9 +132,16 @@ async def called():
 
 @app.post("/beds/{bed_id}/allocate")
 async def allocate(bed_id: str, patient_id: str):
+    t0 = time.perf_counter()
+    agora = int(time.time() * 1000)
     res = await allocate_bed(
         keys=[f"bed:{bed_id}", f"patient:{patient_id}", CHANNEL],
-        args=[bed_id, patient_id, int(time.time() * 1000)])
+        args=[bed_id, patient_id, agora])
+    dblog.registrar("redis", f"EVALSHA ALLOCATE_BED 3 bed:{bed_id} patient:{patient_id} {CHANNEL} {bed_id} {patient_id} {agora}",
+                    ms=(time.perf_counter() - t0) * 1000,
+                    nota={1: "retorno 1: leito alocado", 0: "retorno 0: leito já estava ocupado (outra alocação chegou antes)",
+                          -1: "retorno -1: leito inexistente", -2: "retorno -2: paciente inexistente", -3: "retorno -3: paciente já tem leito"}.get(res))
+    dblog.registrar("lua", ALLOCATE_BED.strip(), nota="código do script ALLOCATE_BED")
     msgs = {0: "Leito já ocupado", -1: "Leito inexistente",
             -2: "Paciente inexistente", -3: "Paciente já possui leito"}
     if res != 1:
@@ -122,7 +151,11 @@ async def allocate(bed_id: str, patient_id: str):
 
 @app.post("/beds/{bed_id}/release")
 async def release(bed_id: str):
+    t0 = time.perf_counter()
     res = await release_bed(keys=[f"bed:{bed_id}", CHANNEL], args=[bed_id])
+    dblog.registrar("redis", f"EVALSHA RELEASE_BED 2 bed:{bed_id} {CHANNEL} {bed_id}", ms=(time.perf_counter() - t0) * 1000,
+                    nota="retorno 1: leito liberado" if res == 1 else "retorno 0: leito já estava livre ou não existe")
+    dblog.registrar("lua", RELEASE_BED.strip(), nota="código do script RELEASE_BED")
     if res != 1:
         raise HTTPException(409, "Leito já está livre ou não existe")
     return {"bed": bed_id, "status": "livre"}

@@ -34,9 +34,9 @@ http {
     listen 80 default_server;
     server_name _;
     root /usr/share/nginx/html;
-    location /kit/ { alias /usr/share/nginx/kit/; }
+    location /kit/ { alias /usr/share/nginx/kit/; add_header Cache-Control no-cache; }
     location = /modulos.json { alias /etc/nginx/modulos.json; add_header Cache-Control no-store; }
-%(saude)s    location / { try_files $uri /index.html; }
+%(saude)s    location / { add_header Cache-Control no-cache; try_files $uri /index.html; }
   }
 %(servidores)s}
 """
@@ -58,6 +58,8 @@ SERVIDOR = """
     location / {
       proxy_pass http://host.docker.internal:%(porta)s;
       proxy_http_version 1.1;
+      proxy_buffer_size 32k;
+      proxy_buffers 8 32k;
       proxy_set_header Host $host;
       proxy_set_header X-Real-IP $remote_addr;
       proxy_set_header Upgrade $http_upgrade;

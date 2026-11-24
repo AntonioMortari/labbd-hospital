@@ -18,6 +18,7 @@ from pydantic import BaseModel
 
 import catalogo
 import db
+import dblog
 
 mimetypes.add_type("font/woff2", ".woff2")  # a imagem slim do Python não conhece .woff2
 
@@ -43,6 +44,18 @@ async def sem_cache_estatico(request: Request, call_next):
 
 app.include_router(catalogo.router)
 app.mount("/static", StaticFiles(directory="static"), name="static")
+
+@app.middleware("http")
+async def log_do_banco(request, call_next):
+    """Se o navegador pediu (X-Log: 1), devolve o que o banco executou nesta requisição."""
+    if request.headers.get("x-log") != "1":
+        return await call_next(request)
+    dblog.iniciar()
+    resposta = await call_next(request)
+    h = dblog.cabecalho()
+    if h:
+        resposta.headers["X-DB-Log"] = h
+    return resposta
 
 # Interface e API de OUTROS módulos (grafo.localhost, triagem.localhost...) chamam esta API pelo navegador.
 # Só origens em localhost, sem credenciais: nenhum site externo ganha acesso.

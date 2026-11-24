@@ -3,7 +3,7 @@ body { overflow-y: auto; }
 .acoes-topo { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
 .acoes-topo .botao { text-decoration: none; }
 .cabecalho { align-items: flex-start; }
-.abas { width: 340px; margin-bottom: 16px; }
+.abas { margin-bottom: 16px; }
 .abas .contador { margin-left: 4px; }
 .barra { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; min-height: 42px; }
 .chamar { display: flex; gap: 8px; margin-left: auto; }
@@ -48,8 +48,6 @@ dialog::backdrop { background: rgba(15, 23, 42, .4); }
 .tabela .acoes .botao { margin-left: 6px; }
 
 /* ---- Redis por dentro */
-.abas { width: 480px; }
-.segmentado.abas { grid-template-columns: repeat(3, 1fr); }
 .resumo { display: grid; grid-template-columns: repeat(4, 1fr); margin: 0 0 4px; }
 .resumo div { padding: 16px 20px; }
 .resumo div + div { border-left: 1px solid var(--borda); }

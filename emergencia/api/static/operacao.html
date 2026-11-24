@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Triagem e leitos</title>
 <link rel="preload" href="/static/fonts/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="/static/kit.css">
+<link rel="stylesheet" href="/static/kit.css?v=3">
 <link rel="stylesheet" href="/static/operacao.css?v=4">
 <script src="/static/embed.js"></script>
 </head>
@@ -14,7 +14,7 @@
   <header class="cabecalho">
     <div><h1>Triagem e leitos</h1><p>Quem está esperando, quem foi chamado e onde cada paciente está internado.</p></div>
     <div class="acoes-topo">
-      <button class="botao fantasma" id="abrir-bastidores" type="button">Bastidores do Redis <span class="contador" id="conta-eventos"></span></button>
+      <button class="botao secundario" id="abrir-bastidores" type="button">Bastidores do Redis <span class="contador" id="conta-eventos"></span></button>
       <a class="botao secundario" href="/" target="_blank" rel="noopener">Painel de chamada</a>
       <button class="botao primario" id="novo" type="button">+ Novo paciente</button>
     </div>
@@ -125,6 +125,7 @@
     <button class="botao fantasma sm" type="button" id="fechar-bastidores">Fechar</button></div>
   <ol class="eventos" id="log"><li class="vazio">As operações aparecem aqui.</li></ol>
 </aside>
-<script src="/static/operacao.js?v=5"></script>
+<script src="/static/detalhes.js?v=3"></script>
+<script src="/static/operacao.js?v=7"></script>
 </body>
 </html>

@@ -12,24 +12,35 @@ let ultimoRedis = "", scriptsCarregados = false;
 let fila = [], leitos = [], chamados = [], internando = null, leitoSel = null, cadastro = [], eventos = 0, ultimo = "";
 
 // ---- chamadas à API, sempre registradas nos bastidores
+// ---- detalhes de cada ação: clicar (ou Enter) num cartão abre o que o banco executou
+const detalhesPorId = new Map(); let seqDetalhe = 0;
+function ligarDetalhes() {
+  const abrir = (el) => { const ev = detalhesPorId.get(el?.dataset.ev); if (ev) Detalhes.abrir(ev); };
+  $("log").addEventListener("click", (e) => abrir(e.target.closest("[data-ev]")));
+  $("log").addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { const c = e.target.closest("[data-ev]"); if (c) { e.preventDefault(); abrir(c); } } });
+}
+
 async function chamar(op, url, opts = {}) {
   const t0 = performance.now();
-  let status = 0, corpo = {};
+  let status = 0, corpo = {}, consultas = [];
   try {
-    const r = await fetch(url, { ...opts, headers: { "Content-Type": "application/json" } });
+    const r = await fetch(url, { ...opts, headers: { "Content-Type": "application/json", "X-Log": "1" } });
     status = r.status;
     corpo = await r.json().catch(() => ({}));
+    consultas = await Detalhes.decodificar(r.headers.get("X-DB-Log")) || [];
   } catch { corpo = { detail: "API fora do ar" }; }
   const ok = status >= 200 && status < 300;
-  registrar(op, ok, status, ok ? "" : (typeof corpo.detail === "string" ? corpo.detail : "Pedido recusado"), performance.now() - t0);
+  registrar(op, ok, status, ok ? "" : (typeof corpo.detail === "string" ? corpo.detail : "Pedido recusado"), performance.now() - t0, { consultas, resposta: corpo });
   return { ok, status, corpo };
 }
-function registrar(op, ok, status, detalhe, ms) {
+function registrar(op, ok, status, detalhe, ms, extra = {}) {
   const regra = REGRA[op.replace(/ \(.*\)$/, "").replace(/\/beds\/[^/]+\//, "/beds/")] || "";
+  const ev = { titulo: op, op, ok, status, ms, regra: detalhe || regra, ...extra }, id = String(++seqDetalhe); detalhesPorId.set(id, ev);
   const li = document.createElement("li");
-  li.className = `evento ${ok ? "ok" : "erro"}`;
+  li.className = `evento ${ok ? "ok" : "erro"} ${ev.consultas?.length ? "clicavel" : ""}`;
+  if (ev.consultas?.length) { li.dataset.ev = id; li.tabIndex = 0; li.setAttribute("role", "button"); }
   li.innerHTML = `<div class="evento-topo"><span class="selo ${ok ? "gravado" : "recusado"}">${ok ? "executado" : "recusado"}</span><b>${status || "—"}</b><time>${new Date().toLocaleTimeString("pt-BR")}</time></div>
-    <div><b>${esc(op)}</b> · ${Math.round(ms)} ms${detalhe ? ` · ${esc(detalhe)}` : ""}</div>${regra ? `<div class="evento-regra">${esc(regra)}</div>` : ""}`;
+    <div><b>${esc(op)}</b> · ${Math.round(ms)} ms${detalhe ? ` · ${esc(detalhe)}` : ""}</div>${regra ? `<div class="evento-regra">${esc(regra)}</div>` : ""}${Detalhes.rodape(ev)}`;
   const log = $("log");
   log.querySelector(".vazio")?.remove();
   log.prepend(li);
@@ -38,7 +49,7 @@ function registrar(op, ok, status, detalhe, ms) {
 }
 
 // ---- desenho
-const espera = (ms) => { const m = Math.max(0, Math.round((Date.now() - ms) / 60000)); return m < 1 ? "agora" : `${m} min`; };
+const espera = (ms) => { const m = Math.max(0, Math.round((Date.now() - ms) / 60000)); return m < 1 ? "agora" : m < 60 ? `${m} min` : m < 1440 ? `${Math.floor(m / 60)} h ${m % 60} min` : `${Math.floor(m / 1440)} d ${Math.floor((m % 1440) / 60)} h`; };
 const pessoas = () => [...new Map([...chamados, ...fila].map((p) => [p.id, p.name])).entries()];
 
 function desenhar() {
@@ -51,11 +62,11 @@ function desenhar() {
   $("tab-fila").hidden = fila.length === 0;
   $("chamar").disabled = fila.length === 0;
   $("tab-fila").querySelector("tbody").innerHTML = fila.map((p, i) => `<tr>
-    <td>${i + 1}</td><td class="forte">${esc(p.name)}${p.paciente_id ? `<span class="sub">cadastro #${esc(p.paciente_id)}</span>` : ""}</td>
-    <td><span class="selo ${PRIO_SELO[p.priority] ?? ""}">${p.priority} · ${PRIO[p.priority] || ""}</span></td><td>${espera(Number(p.arrived_at))}</td><td class="acoes"><button class="botao secundario sm" data-internar="${esc(p.id)}">Internar</button></td></tr>`).join("");
+    <td>${i + 1}</td><td class="forte">${esc(p.name)}${p.paciente_id ? `<span class="sub">paciente do cadastro</span>` : ""}</td>
+    <td><span class="selo ${PRIO_SELO[p.priority] ?? ""}">${p.priority} · ${PRIO[p.priority] || ""}</span></td><td>${espera(Number(p.arrived_at))}</td><td class="acoes"><button class="botao secundario sm" data-internar="${esc(p.id)}">Internar direto</button></td></tr>`).join("");
   $("bloco-chamados").hidden = chamados.length === 0;
-  $("tab-chamados").querySelector("tbody").innerHTML = chamados.map((p) => `<tr><td class="forte">${esc(p.name)}${p.paciente_id ? `<span class="sub">cadastro #${esc(p.paciente_id)}</span>` : ""}</td>
-    <td><span class="selo destaque">${esc(p.room)}</span></td><td class="acoes"><button class="botao primario sm" data-internar="${esc(p.id)}">Internar em leito</button></td></tr>`).join("");
+  $("tab-chamados").querySelector("tbody").innerHTML = chamados.map((p) => `<tr><td class="forte">${esc(p.name)}${p.paciente_id ? `<span class="sub">paciente do cadastro</span>` : ""}</td>
+    <td><span class="selo destaque">${esc(p.room)}</span></td><td class="acoes"><button class="botao primario sm" data-internar="${esc(p.id)}">Escolher leito</button></td></tr>`).join("");
   $("leitos").innerHTML = leitos.map((l) => `<button type="button" role="listitem" class="leito ${l.status === "livre" ? "" : "ocupado"}" data-id="${l.id}" aria-label="Leito ${l.id}, ${l.status}${l.name ? ", " + esc(l.name) : ""}">${l.id}</button>`).join("");
 }
 
@@ -231,3 +242,4 @@ async function carregarRedis() {
   } catch { /* tenta de novo na próxima volta */ }
 }
 setInterval(carregarRedis, 3000);
+ligarDetalhes();

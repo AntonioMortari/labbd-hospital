@@ -2,6 +2,7 @@ import mimetypes
 import os
 import time
 from contextlib import asynccontextmanager
+import dblog
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
@@ -43,8 +44,15 @@ RELACOES = {
 }
 
 def executar(query, **params):
-    with driver.session() as session:
-        return [r.data() for r in session.run(query, **params)]
+    t0 = time.perf_counter()
+    try:
+        with driver.session() as session:
+            rows = [r.data() for r in session.run(query, **params)]
+    except Exception as e:
+        dblog.registrar("cypher", query, params=params, ms=(time.perf_counter() - t0) * 1000, erro=e)
+        raise
+    dblog.registrar("cypher", query, params=params, ms=(time.perf_counter() - t0) * 1000, linhas=len(rows))
+    return rows
 
 @app.post('/nos/{tipo}')
 def criar_no(tipo: str, item: No):
@@ -92,6 +100,27 @@ def demonstracao():
 # ---------------------------------------------------------------------------------------------
 mimetypes.add_type("font/woff2", ".woff2")
 app.mount("/static", StaticFiles(directory="static"), name="static")
+
+@app.middleware("http")
+async def log_do_banco(request, call_next):
+    """Se o navegador pediu (X-Log: 1), devolve o que o banco executou nesta requisição."""
+    if request.headers.get("x-log") != "1":
+        return await call_next(request)
+    dblog.iniciar()
+    resposta = await call_next(request)
+    h = dblog.cabecalho()
+    if h:
+        resposta.headers["X-DB-Log"] = h
+    return resposta
+
+
+@app.middleware("http")
+async def sem_cache_estatico(request, call_next):
+    """Telas mudaram? O navegador revalida em vez de usar cópia velha."""
+    resposta = await call_next(request)
+    if request.url.path == "/" or request.url.path.startswith("/static/"):
+        resposta.headers["Cache-Control"] = "no-cache"
+    return resposta
 
 CYPHER_INTERACAO = """MATCH (p:Paciente {id:$id})-[:USA]->(a:Medicamento)-[r:INTERAGE_COM]-(b:Medicamento)<-[:USA]-(p)
 WHERE a.id < b.id
